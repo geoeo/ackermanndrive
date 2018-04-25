@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+
+	<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="simple_ackermann" >
+		<xacro:macro name="ackermanndrive_plugin">
+			<gazebo>
+				<plugin name="ackermanndrive_plugin" filename="libackermanndrive_plugin.so">
+					<Debug>Debug</rosDebugLevel>
+					<robotNamespace>ackermann</robotNamespace>
+					<CommandTopic>command</CommandTopic>
+					<OdometryTopicEncoder>odometry_encoder</OdometryTopicEncoder>
+					<OdometryTopicGodview>odometry_godview</OdometryTopicGodview>					
+					<odometryFrame>odom</odometryFrame>
+					<robotBaseFrame>base_link</robotBaseFrame>
+					<Wheelbase>0.26</Wheelbase>
+					<Track>0.1525</Track>
+					<SteeringWidth>0.095</SteeringWidth>
+					<Wheeldiameter>0.065</Wheeldiameter>
+					<Steeringvelocity>25.0</Steeringvelocity>
+					<Streeringtorque>1.0</Streeringtorque>
+					<Steeringangle>0.4</Steeringangle>
+					<Wheeltorque>0.1</Wheeltorque>
+					<LeftSteering>left_front_wheelmount_cylinder_to_left_kingpin</LeftSteering>
+					<RightSteering>right_front_wheelmount_cylinder_to_right_kingpin</RightSteering>
+					
+					<LeftFrontWheel>left_kingpin_to_left_front_wheel</LeftFrontWheel>
+					<RightFrontWheel>right_kingpin_to_right_front_wheel</RightFrontWheel>
+					
+					<LeftRearWheel>left_rear_wheel_to_mount</LeftRearWheel>
+					<RightRearWheel>right_rear_wheel_to_mount</RightRearWheel>
+				</plugin>
+			</gazebo>
+		</xacro:macro>
+	</robot>

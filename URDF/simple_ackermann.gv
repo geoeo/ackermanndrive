@@ -1,0 +1,41 @@
+digraph G {
+node [shape=box];
+"base_link" [label="base_link"];
+"left_front_wheelmount_box" [label="left_front_wheelmount_box"];
+"left_front_wheelmount_cylinder" [label="left_front_wheelmount_cylinder"];
+"left_kingpin" [label="left_kingpin"];
+"left_front_wheel" [label="left_front_wheel"];
+"left_rear_wheelmount" [label="left_rear_wheelmount"];
+"left_rear_wheel" [label="left_rear_wheel"];
+"right_front_wheelmount_box" [label="right_front_wheelmount_box"];
+"right_front_wheelmount_cylinder" [label="right_front_wheelmount_cylinder"];
+"right_kingpin" [label="right_kingpin"];
+"right_front_wheel" [label="right_front_wheel"];
+"right_rear_wheelmount" [label="right_rear_wheelmount"];
+"right_rear_wheel" [label="right_rear_wheel"];
+node [shape=ellipse, color=blue, fontcolor=blue];
+"base_link" -> "base_link_to_left_front_wheelmount_box" [label="xyz: 0.125 0.05 0 \nrpy: 0 -0 0"]
+"base_link_to_left_front_wheelmount_box" -> "left_front_wheelmount_box"
+"left_front_wheelmount_box" -> "left_front_wheelmount_box_to_left_front_wheelmount_cylinder" [label="xyz: 0 0.0025 0 \nrpy: 0 -0 0"]
+"left_front_wheelmount_box_to_left_front_wheelmount_cylinder" -> "left_front_wheelmount_cylinder"
+"left_front_wheelmount_cylinder" -> "left_front_wheelmount_cylinder_to_left_kingpin" [label="xyz: 0 0 0 \nrpy: 0 -0 0"]
+"left_front_wheelmount_cylinder_to_left_kingpin" -> "left_kingpin"
+"left_kingpin" -> "left_kingpin_to_left_front_wheel" [label="xyz: 0 0.01 0 \nrpy: 0 -0 0"]
+"left_kingpin_to_left_front_wheel" -> "left_front_wheel"
+"base_link" -> "base_link_to_left_rear_wheelmount" [label="xyz: -0.125 0.055 0 \nrpy: 0 -0 0"]
+"base_link_to_left_rear_wheelmount" -> "left_rear_wheelmount"
+"left_rear_wheelmount" -> "left_rear_wheel_to_mount" [label="xyz: 0 0.005 0 \nrpy: 0 -0 0"]
+"left_rear_wheel_to_mount" -> "left_rear_wheel"
+"base_link" -> "base_link_to_right_front_wheelmount_box" [label="xyz: 0.125 -0.05 0 \nrpy: 0 -0 0"]
+"base_link_to_right_front_wheelmount_box" -> "right_front_wheelmount_box"
+"right_front_wheelmount_box" -> "right_front_wheelmount_box_to_right_front_wheelmount_cylinder" [label="xyz: 0 -0.0025 0 \nrpy: 0 -0 0"]
+"right_front_wheelmount_box_to_right_front_wheelmount_cylinder" -> "right_front_wheelmount_cylinder"
+"right_front_wheelmount_cylinder" -> "right_front_wheelmount_cylinder_to_right_kingpin" [label="xyz: 0 0 0 \nrpy: 0 -0 0"]
+"right_front_wheelmount_cylinder_to_right_kingpin" -> "right_kingpin"
+"right_kingpin" -> "right_kingpin_to_right_front_wheel" [label="xyz: 0 -0.01 0 \nrpy: 0 -0 0"]
+"right_kingpin_to_right_front_wheel" -> "right_front_wheel"
+"base_link" -> "base_link_to_right_rear_wheelmount" [label="xyz: -0.125 -0.055 0 \nrpy: 0 -0 0"]
+"base_link_to_right_rear_wheelmount" -> "right_rear_wheelmount"
+"right_rear_wheelmount" -> "right_rear_wheel_to_mount" [label="xyz: 0 -0.005 0 \nrpy: 0 -0 0"]
+"right_rear_wheel_to_mount" -> "right_rear_wheel"
+}

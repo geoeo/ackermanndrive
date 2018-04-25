@@ -1,0 +1,210 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+	<!--<xacro:property name="pi" value="3.1415926535897931" />-->
+
+	<xacro:macro name="default_inertial" params="mass">
+		<inertial>
+			<mass value="${mass}" />
+			<inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.001" iyz="0.0" izz="0.001" />
+		</inertial>
+	</xacro:macro>
+
+	<xacro:macro name="cylinder_inertial" params="radius length mass">
+		<inertial>
+			<mass value="${mass}" />
+			<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+			<inertia
+				ixx="${0.0833333 * mass * (3 * radius * radius + length * length)}" ixy="0.0" ixz="0.0"
+				iyy="${0.0833333 * mass * (3 * radius * radius + length * length)}" iyz="0.0"
+				izz="${0.5 * mass * radius * radius}" />
+		</inertial>
+	</xacro:macro>
+
+	<xacro:macro name="cylinder_inertial_wheels" params="radius length mass">
+		<inertial>
+			<mass value="${mass}" />
+			<origin xyz="0.0 ${reflect*wheelwidth/2} 0.0" rpy="${pi/2} 0.0 0.0"/>
+			<inertia
+				ixx="${0.0833333 * mass * (3 * radius * radius + length * length)}" ixy="0.0" ixz="0.0"
+				iyy="${0.0833333 * mass * (3 * radius * radius + length * length)}" iyz="0.0"
+				izz="${0.5 * mass * radius * radius}" />
+		</inertial>
+	</xacro:macro>
+
+	<xacro:macro name="box_inertial" params="x y z mass">
+		<inertial>
+			<mass value="${mass}" />
+			<origin xyz="0 0 0" />
+			<inertia
+				ixx="${0.0833333 * mass * (y*y + z*z)}" ixy="0.0" ixz="0.0"
+				iyy="${0.0833333 * mass * (x*x + z*z)}" iyz="0.0"
+				izz="${0.0833333 * mass * (x*x + y*y)}" />
+		</inertial>
+	</xacro:macro>
+
+	<xacro:macro name="box_inertial_kingpin" params="x y z mass">
+		<inertial>
+			<mass value="${mass}" />
+			<origin xyz="0.0 ${reflect*3*height/4} 0.0" rpy="0.0 0.0 0.0"/>
+			<inertia
+				ixx="${0.0833333 * mass * (y*y + z*z)}" ixy="0.0" ixz="0.0"
+				iyy="${0.0833333 * mass * (x*x + z*z)}" iyz="0.0"
+				izz="${0.0833333 * mass * (x*x + y*y)}" />
+		</inertial>
+	</xacro:macro>
+
+	<xacro:macro name="cylinder_inertial_with_origin" params="radius length mass *origin">
+		<inertial>
+			<mass value="${mass}" />
+			<xacro:insert_block name="origin" />
+			<inertia
+				ixx="${0.0833333 * mass * (3 * radius * radius + length * length)}" ixy="0.0" ixz="0.0"
+				iyy="${0.0833333 * mass * (3 * radius * radius + length * length)}" iyz="0.0"
+				izz="${0.5 * mass * radius * radius}" />
+		</inertial>
+	</xacro:macro>
+
+	<xacro:macro name="box_inertial_with_origin" params="x y z mass *origin">
+		<inertial>
+			<mass value="${mass}" />
+			<xacro:insert_block name="origin" />
+			<inertia
+				ixx="${0.0833333 * mass * (y*y + z*z)}" ixy="0.0" ixz="0.0"
+				iyy="${0.0833333 * mass * (x*x + z*z)}" iyz="0.0"
+				izz="${0.0833333 * mass * (x*x + y*y)}" />
+		</inertial>
+	</xacro:macro>
+
+	<xacro:macro name="front_wheel" params="side reflect height wheelbase track wheeldiameter wheelwidth">
+		
+		<joint name="base_link_to_${side}_front_wheelmount_box" type="fixed">
+			<origin xyz="${(wheelbase/2-height/2)} ${reflect*(track-wheelwidth-5*height/2)/2} 0.0" rpy="0.0 0.0 0.0"/>
+			<parent link="base_link"/>
+			<child link="${side}_front_wheelmount_box"/>
+		</joint>		
+
+		<link name="${side}_front_wheelmount_box">
+			<visual>
+				<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+				<geometry name="wheelmount_geometry">
+					<box size="${height} ${height/2} ${height}" />
+				</geometry>
+				<material name="green">
+					<color rgba="0.0 0.75 0.0 1.0"/>
+				</material>
+			</visual>
+			<collision>
+				<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+				<geometry name="wheelmount_geometry">
+					<box size="${height} ${height/2} ${height}" />
+				</geometry>
+			</collision>
+			<xacro:box_inertial x="${height}" y="${height/2}" z="${height}" mass="0.005"/>
+		</link>
+		<gazebo reference="${side}_front_wheelmount_box">
+			<material value="Gazebo/Red"/>
+		</gazebo>
+
+		<joint name="${side}_front_wheelmount_box_to_${side}_front_wheelmount_cylinder" type="fixed">
+			<origin xyz="0.0 ${reflect*height/4} 0.0" rpy="0.0 0.0 0.0"/>
+			<parent link="${side}_front_wheelmount_box"/>
+			<child link="${side}_front_wheelmount_cylinder"/>
+		</joint>
+
+		<link name="${side}_front_wheelmount_cylinder">
+			<visual>
+				<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+				<geometry name="wheelmount_geometry">
+					<cylinder radius="${height/2}" length="${height}" />
+				</geometry>
+				<material name="green">
+					<color rgba="0.0 0.75 0.0 1.0"/>
+				</material>
+			</visual>
+			<collision>
+				<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+				<geometry name="wheelmount_geometry">
+					<cylinder radius="${height/2}" length="${height}" />
+				</geometry>
+			</collision>
+			<xacro:cylinder_inertial radius="${height/2}" length="${height}" mass="0.005"/>
+		</link>
+		<gazebo reference="${side}_front_wheelmount_cylinder">
+			<material value="Gazebo/Red"/>
+		</gazebo>
+
+		<joint name="${side}_front_wheelmount_cylinder_to_${side}_kingpin" type="revolute">
+		  	<axis xyz="0.0 0.0 1.0"/>
+		  	<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
+			<parent link="${side}_front_wheelmount_cylinder"/>
+			<child link="${side}_kingpin"/>
+			<limit lower="-0.41" upper="0.41" effort="100" velocity="100"/>
+			<joint_properties damping="1.0" friction="0.0"/>
+		</joint>
+		<gazebo reference="${side}_front_wheelmount_cylinder_to_${side}_kingpin">
+			<!-- <cfm>0.001</cfm>		added because of problems with this link -->
+ 			<!-- <erp>0.500</erp>		added because of problems with this link -->
+			<!-- <kp>10000000.0</kp>	contact stiffness	added because of problems with this link -->
+			<!-- <kd>1.00000000</kd>	cantact damping		added because of problems with this link --> 
+		</gazebo>
+
+		<link name="${side}_kingpin">
+			<visual>
+				<origin xyz="0.0 ${reflect*3*height/4} 0.0" rpy="0.0 0.0 0.0"/>
+				<geometry name="kingpin_geometry">
+					<box size="${height} ${height/2} ${height}" />
+				</geometry>
+				<material name="orange">
+					<color rgba="1.0 0.5 0.0 1.0"/>
+				</material>
+			</visual>
+			<collision>
+				<origin xyz="0.0 ${reflect*3*height/4} 0.0" rpy="0.0 0.0 0.0"/>
+				<geometry name="kingpin_geometry">
+					<box size="${height} ${height/2} ${height}" />
+				</geometry>
+			</collision>
+			<xacro:box_inertial_kingpin x="${height}" y="${height/2}" z="${height}" mass="0.005"/>
+		</link>
+		<gazebo reference="${side}_kingpin">
+			<material value="Gazebo/Orange"/>
+		</gazebo>
+
+		<joint name="${side}_kingpin_to_${side}_front_wheel" type="continuous">
+			<axis xyz="0.0 1.0 0.0"/>
+			<origin xyz="0.0 ${reflect*height} 0.0" rpy="0.0 0.0 0.0"/>
+			<parent link="${side}_kingpin"/>
+			<child link="${side}_front_wheel"/>
+		</joint>
+
+		<link name="${side}_front_wheel">
+			<visual>
+				<origin xyz="0.0 ${reflect*wheelwidth/2} 0.0" rpy="${pi/2} 0.0 0.0"/>
+				<geometry name="wheel_geom">
+					<cylinder radius="${wheeldiameter/2}" length="${wheelwidth}" />
+				</geometry>
+				<material name="black">
+					<color rgba="0.0 0.0 0.0 1.0"/>
+				</material>
+			</visual>
+			<collision>
+				<origin xyz="0.0 ${reflect*wheelwidth/2} 0.0" rpy="${pi/2} 0.0 0.0"/>
+				<geometry name="wheel_geom">
+					<cylinder radius="${wheeldiameter/2}" length="${wheelwidth}" />
+				</geometry>
+			</collision>
+			<xacro:cylinder_inertial_wheels radius="${wheeldiameter/2}" length="${wheelwidth}" mass="0.01"/>
+		</link>
+		<gazebo reference="${side}_front_wheel">
+			<mu1>10.0</mu1>		<!-- friction coeffciant 1 -->
+			<mu2>10.0</mu2>		<!-- friction coeffciant 2 -->
+			<kp>100000.0</kp>	<!-- contact stiffness 	-->
+			<kd>10.0</kd>		<!-- cantact damping 	-->
+			<material value="Gazebo/Black"/>
+		</gazebo>
+
+	</xacro:macro>
+
+</robot>

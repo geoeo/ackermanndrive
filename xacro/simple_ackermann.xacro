@@ -1,0 +1,61 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="simple_ackermann" >
+	
+
+	<xacro:include filename="$(find ackermanndrive)/xacro/simple_ackermann_rear_wheel.xacro"/>
+	<xacro:include filename="$(find ackermanndrive)/xacro/simple_ackermann_front_wheel.xacro"/>
+	<xacro:include filename="$(find ackermanndrive)/xacro/simple_ackermann_plugin.xacro"/>
+
+	<xacro:property name="height" value="0.01" />
+	<xacro:property name="wheelbase" value="0.26" />
+	<xacro:property name="track" value="0.1525" />
+	<xacro:property name="wheeldiameter" value="0.065" />
+	<!--xacro:property name="wheelwidth" value="0.001" /-->
+	<xacro:property name="wheelwidth" value="0.0275" />
+
+	<xacro:macro name="box_inertial" params="x y z mass">
+		<inertial>
+			<mass value="${mass}" />
+			<origin xyz="0 0 0" />
+			<inertia
+				ixx="${0.0833333 * mass * (y*y + z*z)}" ixy="0.0" ixz="0.0"
+				iyy="${0.0833333 * mass * (x*x + z*z)}" iyz="0.0"
+				izz="${0.0833333 * mass * (x*x + y*y)}" />
+		</inertial>
+	</xacro:macro>
+
+	<link name="base_link">
+		<visual name="chassis_visual">
+			<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+			<geometry name="base_link_geomety">
+				<box size="${wheelbase} ${track-wheelwidth-(3*height)} ${height}"/>
+			</geometry>
+			<material name="red">
+				<color rgba="1.0 0.0 0.0 1.0"/>
+			</material>
+		</visual>
+		<collision>
+			<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+			<geometry name="base_link_geomety">
+				<box size="${wheelbase} ${track-wheelwidth-(3*height)} ${height}"/>
+			</geometry> 
+		</collision>
+		<xacro:box_inertial x="${wheelbase}" y="${track-wheelwidth-(3*height)}" z="${height}" mass="1.0" />
+	</link>
+	<gazebo reference="base_link">
+		<material value="Gazebo/Red"/>
+	</gazebo>
+
+	
+
+
+	<xacro:rear_wheel side="left" reflect="1.0" height="${height}" wheelbase="${wheelbase}" track="${track}" wheeldiameter="${wheeldiameter}" wheelwidth="${wheelwidth}"/>
+	<xacro:rear_wheel side="right" reflect="-1.0" height="${height}" wheelbase="${wheelbase}" track="${track}" wheeldiameter="${wheeldiameter}" wheelwidth="${wheelwidth}"/>
+	<xacro:front_wheel side="left" reflect="1.0" height="${height}" wheelbase="${wheelbase}" track="${track}" wheeldiameter="${wheeldiameter}" wheelwidth="${wheelwidth}"/>
+	<xacro:front_wheel side="right" reflect="-1.0" height="${height}" wheelbase="${wheelbase}" track="${track}" wheeldiameter="${wheeldiameter}" wheelwidth="${wheelwidth}"/>
+
+	
+	<xacro:ackermanndrive_plugin/>
+
+</robot>

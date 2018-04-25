@@ -1,0 +1,109 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="simple_ackermann" >
+
+	<xacro:macro name="default_inertial" params="mass">
+		<inertial>
+			<mass value="${mass}" />
+			<inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0" />
+		</inertial>
+	</xacro:macro>
+
+	<xacro:macro name="cylinder_inertial" params="radius length mass">
+		<inertial>
+			<mass value="${mass}" />
+			<origin xyz="0 0 0" />
+			<inertia
+				ixx="${0.0833333 * mass * (3 * radius * radius + length * length)}" ixy="0.0" ixz="0.0"
+				iyy="${0.0833333 * mass * (3 * radius * radius + length * length)}" iyz="0.0"
+				izz="${0.5 * mass * radius * radius}" />
+		</inertial>
+	</xacro:macro>
+
+	<xacro:macro name="cylinder_inertial_wheels" params="radius length mass">
+		<inertial>
+			<mass value="${mass}" />
+			<origin xyz="0.0 ${reflect*wheelwidth/2} 0.0" rpy="${pi/2} 0.0 0.0"/>
+			<inertia
+				ixx="${0.0833333 * mass * (3 * radius * radius + length * length)}" ixy="0.0" ixz="0.0"
+				iyy="${0.0833333 * mass * (3 * radius * radius + length * length)}" iyz="0.0"
+				izz="${0.5 * mass * radius * radius}" />
+		</inertial>
+	</xacro:macro>
+
+	<xacro:macro name="box_inertial" params="x y z mass">
+		<inertial>
+			<mass value="${mass}" />
+			<origin xyz="0 0 0" />
+			<inertia
+				ixx="${0.0833333 * mass * (y*y + z*z)}" ixy="0.0" ixz="0.0"
+				iyy="${0.0833333 * mass * (x*x + z*z)}" iyz="0.0"
+				izz="${0.0833333 * mass * (x*x + y*y)}" />
+		</inertial>
+	</xacro:macro>
+
+	<xacro:macro name="rear_wheel" params="side reflect height wheelbase track wheeldiameter wheelwidth">   
+		
+		<joint name="base_link_to_${side}_rear_wheelmount" type="fixed">
+			<origin xyz="${-(wheelbase/2-height/2)} ${reflect*(track-wheelwidth-3*height/2)/2} 0.0" rpy="0.0 0.0 0.0"/>
+			<parent link="base_link"/>
+			<child link="${side}_rear_wheelmount"/>
+		</joint>
+
+		<link name="${side}_rear_wheelmount">
+			<visual>
+				<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+				<geometry name="wheelmount_geometry">
+					<box size="${height} ${3*height/2} ${height}" />
+				</geometry>
+				<material name="green">
+					<color rgba="0.0 0.75 0.0 1.0"/>
+				</material>
+			</visual>
+			<collision>
+				<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+				<geometry name="wheelmount_geometry">
+					<box size="${height} ${3*height/2} ${height}" />
+				</geometry>
+			</collision>
+		<xacro:box_inertial x="${height}" y="${3*height/2}" z ="${height}" mass="0.015"/>
+		</link>
+		<gazebo reference="${side}_rear_wheelmount">
+			<material value="Gazebo/Red"/>
+		</gazebo>
+
+		<joint name="${side}_rear_wheel_to_mount" type="continuous">
+			<axis xyz="0.0 1.0 0.0"/>
+			<origin xyz="0.0 ${reflect*height/2} 0.0" rpy="0.0 0.0 0.0"/>
+			<parent link="${side}_rear_wheelmount"/>
+			<child link="${side}_rear_wheel"/>
+		</joint>
+
+		<link name="${side}_rear_wheel">
+			<visual>
+				<origin xyz="0.0 ${reflect*wheelwidth/2} 0.0" rpy="${pi/2} 0.0 0.0"/>
+				<geometry name="wheel_geom">
+					<cylinder radius="${wheeldiameter/2}" length="${wheelwidth}" />
+				</geometry>
+				<material name="black">
+					<color rgba="0.0 0.0 0.0 1.0"/>
+				</material>
+			</visual>
+			<collision>
+				<origin xyz="0.0 ${reflect*wheelwidth/2} 0.0" rpy="${pi/2} 0.0 0.0"/>
+				<geometry name="wheel_geom">
+					<cylinder radius="${wheeldiameter/2}" length="${wheelwidth}" />
+				</geometry>
+			</collision>
+			<xacro:cylinder_inertial_wheels radius="${wheeldiameter/2}" length="${wheelwidth}" mass="0.01"/>
+		</link>
+		<gazebo reference="${side}_rear_wheel">
+			<mu1>10.0</mu1>
+			<mu2>10.0</mu2>
+			<kp>1000000.0</kp>
+			<kd>10.0</kd>
+			<material value="Gazebo/Black"/>
+		</gazebo>
+	</xacro:macro>
+
+</robot>
