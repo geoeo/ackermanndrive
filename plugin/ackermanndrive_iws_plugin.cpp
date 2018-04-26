@@ -74,8 +74,6 @@ namespace gazebo {
         // listen to the update event (broadcast every simulation iteration)
         this->update_connection_  = event::Events::ConnectWorldUpdateBegin ( boost::bind ( &Ackermannplugin_IWS::UpdateChild, this ) );
         ROS_INFO("Ackermann Drive IWS Plugin loaded!");
-        if(debug)
-            ROS_INFO("Debug On");
     }
 
     void Ackermannplugin_IWS::cmdVelCallback ( const geometry_msgs::Twist::ConstPtr& cmd_msg ) {
@@ -94,13 +92,9 @@ namespace gazebo {
 
     void Ackermannplugin_IWS::cmdIWSCallback ( const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg ) {
         boost::mutex::scoped_lock scoped_lock ( IWS_message_lock );
-        if(debug)
-            ROS_INFO("IWS Received");
+        ROS_DEBUG("IWS Received");
         wheel_velocity = cmd_msg->revolute[0];
         steering_omega = cmd_msg->steering[0];
-
-
-
 
     }
 
@@ -115,72 +109,33 @@ namespace gazebo {
         wheels_[LEFT ] -> SetParam( "vel", 0, wheel_velocity );
         wheels_[RIGHT] -> SetParam( "vel", 0, wheel_velocity );
 
-        //double wheel_vel = fmin(target_velocity,1.0);
-        //double steering = angle_center * M_PI/4.0; // angle_center max is 2.0 TODO: Make this config dependent
-
-        //double small_curve_radius_max = steeringangle;
-        //double small_curve_radius_min = -steeringangle;
-
-        /////////////
-        //double wheel_angle = (sin(steering)/wheelbase);
-
-
-        //if (wheel_angle > small_curve_radius_max ) wheel_angle = small_curve_radius_max;
-        //else if (wheel_angle < small_curve_radius_min ) wheel_angle = small_curve_radius_min;
 
         // steering control
         actual_angle_[2];
         actual_angle_[LEFT ] = steerings_[LEFT ] -> GetAngle(0).Radian();
         actual_angle_[RIGHT] = steerings_[RIGHT] -> GetAngle(0).Radian();
 
+        //actual_angle_[LEFT ] = steerings_[LEFT ] -> GetVelocity(0);
+        //actual_angle_[RIGHT] = steerings_[RIGHT] -> GetVelocity(0);
+
+        // round to 1 d.p to avoid numerical errors TODO: Refactor for adjustable decimal places
+        actual_angle_[LEFT ] = ceil(actual_angle_[LEFT ]*10.0)/10.0;
+        actual_angle_[RIGHT ] = ceil(actual_angle_[RIGHT ]*10.0)/10.0;
+
+        ROS_DEBUG("left angle: %f",actual_angle_[LEFT ]);
+        ROS_DEBUG("right angle: %f",actual_angle_[RIGHT ]);
+        ROS_DEBUG("steering omega: %f",steering_omega);
+
         double delta_omega_[2];
-        // Corrects back to 0 angle if steering = 0
-        delta_omega_[LEFT ] = steering_omega - actual_angle_[LEFT ];
-        delta_omega_[RIGHT] = steering_omega - actual_angle_[RIGHT];
-
-        // no correction
-        //factor_[LEFT ] = wheel_angle;
-        //factor_[RIGHT] = wheel_angle;
-
-        /////////////
-
-        /////////////
-        //if (angle_center > small_curve_radius_max ) angle_center = small_curve_radius_max;
-        //else if (angle_center < small_curve_radius_min ) angle_center = small_curve_radius_min;
-
-        //target_angle_[2];
-        //target_angle_[LEFT ] = 0;
-        //target_angle_[RIGHT] = 0;
-
-        //if (  angle_center != 0 ) {
-        //    curve_radius = wheelbase / tan ( angle_center ); //curve radius for the imaginary centerd wheel
-        //    target_angle_[LEFT ] = atan( wheelbase / ( curve_radius - steeringwidth / 2 ) );
-        //    target_angle_[RIGHT] = atan( wheelbase / ( curve_radius + steeringwidth / 2 ) );
-        //}
 
         // Corrects back to 0 angle if steering = 0
-        //factor_[LEFT ] = (target_angle_[LEFT ] - actual_angle_[LEFT ]);
-        //factor_[RIGHT] = (target_angle_[RIGHT] - actual_angle_[RIGHT]);
-
-        /////////////
+        delta_omega_[LEFT ] = steering_omega != 0.0 ? steering_omega : -steeringfactor*actual_angle_[LEFT ];
+        delta_omega_[RIGHT] =  steering_omega != 0.0 ? steering_omega : -steeringfactor*actual_angle_[RIGHT ];
 
 
+        steerings_[LEFT ]->SetParam("vel", 0, delta_omega_[LEFT ]);
+        steerings_[RIGHT]->SetParam("vel", 0, delta_omega_[RIGHT]);
 
-        // Steering stays when steering = 0
-        //factor_[LEFT ] = wheel_angle*steeringfactor;
-        //factor_[RIGHT] = wheel_angle*steeringfactor;
-
-        if (delta_omega_[LEFT ] > 1.0) delta_omega_[LEFT ] = 1.0;
-        else if (delta_omega_[LEFT ] < -1.0) delta_omega_[LEFT ] = -1.0;
-
-        if (delta_omega_[RIGHT] > 1.0) delta_omega_[RIGHT] = 1.0;
-        else if (delta_omega_[RIGHT] < -1.0) delta_omega_[RIGHT] = -1.0;
-
-        steerings_[LEFT ]->SetParam("vel", 0, delta_omega_[LEFT ]*steeringfactor);
-        steerings_[RIGHT]->SetParam("vel", 0, delta_omega_[RIGHT]*steeringfactor);
-
-        //steerings_[LEFT ]->SetParam("vel",factor_[LEFT]*steeringvelocity);
-        //steerings_[RIGHT]->SetParam("vel", factor_[RIGHT]*steeringvelocity);
 
         last_update_time_ = last_update_time_ + common::Time ( update_period_ );
     }

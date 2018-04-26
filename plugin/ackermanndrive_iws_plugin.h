@@ -49,7 +49,7 @@ namespace gazebo {
 
         boost::mutex lock;
         boost::mutex IWS_message_lock;
-        bool debug;
+        bool gazebo_debug;
 
         //Robot Parameters
         double wheelbase;
