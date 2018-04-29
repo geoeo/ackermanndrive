@@ -31,10 +31,11 @@ namespace gazebo {
         gazebo_ros_ -> getParameter<double> ( track, 			"Track",		0.0 );
         gazebo_ros_ -> getParameter<double> ( steeringwidth, 		"SteeringWidth",	0.0 );
         gazebo_ros_ -> getParameter<double> ( wheeldiameter, 		"Wheeldiameter",	0.0 );
-        gazebo_ros_ -> getParameter<double> ( steeringfactor, 	    "Steeringfactor",	 10.0 );
+        gazebo_ros_ -> getParameter<double> ( steeringVelocity, 	"SteeringVelocity",	 10.0 );
         gazebo_ros_ -> getParameter<double> ( streeringtorque, 		"Streeringtorque",	10.0 );
         gazebo_ros_ -> getParameter<double> ( steeringangle, 		"Steeringangle",	0.0  );
         gazebo_ros_ -> getParameter<double> ( wheeltorque,			"Wheeltorque",	10.0 );
+        gazebo_ros_ -> getParameter<bool> ( gazebo_debug,			"GazeboDebug",	false );
 
         target_velocity = 0.0;
 
@@ -56,11 +57,6 @@ namespace gazebo {
         if ( this->update_rate_ > 0.0 ) this->update_period_ = 1.0 / this->update_rate_;
         else this->update_period_ = 0.0;
         last_update_time_ = parent->GetWorld()->GetSimTime();
-        transform_broadcaster_ = boost::shared_ptr<tf::TransformBroadcaster>(new tf::TransformBroadcaster());
-
-        // rostopic publisher
-        odometry_publisher_godview_ = gazebo_ros_->node()->advertise<nav_msgs::Odometry>(odometry_topic_godview_, 1);
-        odometry_publisher_encoder_ = gazebo_ros_->node()->advertise<nav_msgs::Odometry>(odometry_topic_encoder_, 1);
 
         // rostopic subscriber
         ros::SubscribeOptions so_twist = ros::SubscribeOptions::create<geometry_msgs::Twist>(command_topic_, 1, boost::bind(&Ackermannplugin_IWS::cmdVelCallback, this, _1), ros::VoidPtr(), &queue_);
@@ -99,10 +95,6 @@ namespace gazebo {
     }
 
     void Ackermannplugin_IWS::UpdateChild() {
-        common::Time current_time = parent->GetWorld()->GetSimTime();
-        double seconds_since_last_update = ( current_time - last_update_time_ ).Double();
-        PublishOdometryGodview ( seconds_since_last_update );
-        PublishOdometryEncoder ( seconds_since_last_update );
 
         // wheelcontroll
         //double velocity = target_velocity / ( wheeldiameter / 2.0 );
@@ -118,19 +110,22 @@ namespace gazebo {
         //actual_angle_[LEFT ] = steerings_[LEFT ] -> GetVelocity(0);
         //actual_angle_[RIGHT] = steerings_[RIGHT] -> GetVelocity(0);
 
-        // round to 1 d.p to avoid numerical errors TODO: Refactor for adjustable decimal places
-        actual_angle_[LEFT ] = ceil(actual_angle_[LEFT ]*10.0)/10.0;
-        actual_angle_[RIGHT ] = ceil(actual_angle_[RIGHT ]*10.0)/10.0;
+        // round to 1 d.p to avoid numerical errors
+        actual_angle_[LEFT ] = roundTo(actual_angle_[LEFT ],1);
+        actual_angle_[RIGHT ] = roundTo(actual_angle_[RIGHT ],1);
 
-        ROS_DEBUG("left angle: %f",actual_angle_[LEFT ]);
-        ROS_DEBUG("right angle: %f",actual_angle_[RIGHT ]);
-        ROS_DEBUG("steering omega: %f",steering_omega);
+        if(gazebo_debug){
+            ROS_INFO("left angle: %f",actual_angle_[LEFT ]);
+            ROS_INFO("right angle: %f",actual_angle_[RIGHT ]);
+            ROS_INFO("steering omega: %f",steering_omega);
+        }
 
         double delta_omega_[2];
 
         // Corrects back to 0 angle if steering = 0
-        delta_omega_[LEFT ] = steering_omega != 0.0 ? steering_omega : -steeringfactor*actual_angle_[LEFT ];
-        delta_omega_[RIGHT] =  steering_omega != 0.0 ? steering_omega : -steeringfactor*actual_angle_[RIGHT ];
+        // seems that left wheel has initial angle of 0.1
+        delta_omega_[LEFT ] = steering_omega != 0.0 ? steering_omega : actual_angle_[LEFT ] <= -0.1 || actual_angle_[LEFT ] >= 0.1 ? -steeringVelocity* sin(actual_angle_[LEFT ])/wheelbase : 0.0;
+        delta_omega_[RIGHT] =  steering_omega != 0.0  ? steering_omega : actual_angle_[RIGHT ] <= -0.1 || actual_angle_[RIGHT ] >= 0.1 ?  -steeringVelocity*sin(actual_angle_[RIGHT ])/wheelbase : 0.0;
 
 
         steerings_[LEFT ]->SetParam("vel", 0, delta_omega_[LEFT ]);
@@ -147,158 +142,15 @@ namespace gazebo {
         }
     }
 
-    void Ackermannplugin_IWS::PublishOdometryGodview ( double step_time ) {
-        ros::Time current_time = ros::Time::now();
-        std::string odom_frame = gazebo_ros_->resolveTF ( odometry_frame_ );
-        std::string base_footprint_frame = gazebo_ros_->resolveTF ( robot_base_frame_ );
+    double Ackermannplugin_IWS::roundTo(double value, int decimal_places) {
 
-        tf::Quaternion qt;
-        tf::Vector3 vt;
+        double factor = pow(10.0,(double)decimal_places);
 
-        // getting data form gazebo world
-        math::Pose pose = parent->GetWorldPose();
-
-        vt = tf::Vector3 ( pose.pos.x, pose.pos.y, pose.pos.z );
-        odometry_godview_.pose.pose.position.x = vt.x();
-        odometry_godview_.pose.pose.position.y = vt.y();
-        odometry_godview_.pose.pose.position.z = vt.z();
-
-        qt = tf::Quaternion ( pose.rot.x, pose.rot.y, pose.rot.z, pose.rot.w );
-        odometry_godview_.pose.pose.orientation.x = qt.x();
-        odometry_godview_.pose.pose.orientation.y = qt.y();
-        odometry_godview_.pose.pose.orientation.z = qt.z();
-        odometry_godview_.pose.pose.orientation.w = qt.w();
-
-        // get velocity in /odom frame
-        math::Vector3 linear;
-        linear = parent->GetWorldLinearVel();
-        odometry_godview_.twist.twist.angular.z = parent->GetWorldAngularVel().z;
-
-        // convert velocity to child_frame_id (aka base_footprint)
-        float yaw = pose.rot.GetYaw();
-        odometry_godview_.twist.twist.linear.x = cosf ( yaw ) * linear.x + sinf ( yaw ) * linear.y;
-        odometry_godview_.twist.twist.linear.y = cosf ( yaw ) * linear.y - sinf ( yaw ) * linear.x;
-
-        tf::Transform base_footprint_to_odom ( qt, vt );
-        transform_broadcaster_->sendTransform (	tf::StampedTransform ( base_footprint_to_odom , current_time , odom_frame, base_footprint_frame ) );
-
-        // covariance
-        odometry_godview_.pose.covariance[ 0+0] = 0.0;
-        odometry_godview_.pose.covariance[ 6+1] = 0.0;
-        odometry_godview_.pose.covariance[12+2] = 0.0;
-        odometry_godview_.pose.covariance[18+3] = 0.0;
-        odometry_godview_.pose.covariance[24+4] = 0.0;
-        odometry_godview_.pose.covariance[30+5] = 0.0;
-
-        // set header
-        odometry_godview_.header.stamp = current_time;
-        odometry_godview_.header.frame_id = odom_frame;
-        odometry_godview_.child_frame_id = base_footprint_frame;
-
-        // publish godview odometry
-        odometry_publisher_godview_.publish ( odometry_godview_ );
+        return ceil(value*factor)/factor;
     }
 
-    void Ackermannplugin_IWS::PublishOdometryEncoder ( double step_time ) {
-        ros::Time current_time = ros::Time::now();
-        std::string odom_frame = gazebo_ros_->resolveTF ( odometry_frame_ );
-        std::string base_footprint_frame = gazebo_ros_->resolveTF ( robot_base_frame_ );
 
-        common::Time actual_time = parent->GetWorld()->GetSimTime();
-        double seconds_since_last_update = ( actual_time - last_odom_update_ ).Double();
-        last_odom_update_ = actual_time;
 
-        v = target_velocity;
-        if ( angle_center == 0 ) w = 0;
-        if ( angle_center != 0 ) w = v * tan(angle_center) / wheelbase ;
-
-        double dt = seconds_since_last_update;
-        double dx = v * cos(pose_encoder_.theta) * seconds_since_last_update;
-        double dy = v * sin(pose_encoder_.theta) * seconds_since_last_update;
-        double dtheta = w * seconds_since_last_update;
-
-        double alpha_1 = 1.0;
-        double alpha_2 = 1.0;
-        double alpha_3 = 1.0;
-        double alpha_4 = 1.0;
-
-        // calculating the covariance matrix
-        //G = cv::Matx<double, 3, 3> (1.0, 0, -abs(v)*dt*sin(pose_encoder_.theta), 0, 1.0,  abs(v)*dt*cos(pose_encoder_.theta), 0, 0,  1.0);
-        if ( v >= 0 ) {
-            G = cv::Matx<double, 3, 3> (1.0, 0, -(v*dt*sin(pose_encoder_.theta)), 0, 1.0,  (v*dt*cos(pose_encoder_.theta)), 0, 0,  1.0);
-            V = cv::Matx<double, 3, 2> (dt*cos(pose_encoder_.theta), 0, dt*sin(pose_encoder_.theta), 0, dt*tan(angle_center)/wheelbase, (v)*dt / (wheelbase *cos(angle_center)*cos(angle_center)));
-        } else {
-            G = cv::Matx<double, 3, 3> (1.0, 0, -(v*dt*sin(pose_encoder_.theta+M_PI)), 0, 1.0,  (v*dt*cos(pose_encoder_.theta+M_PI)), 0, 0,  1.0);
-            V = cv::Matx<double, 3, 2> (dt*cos(pose_encoder_.theta+M_PI), 0, dt*sin(pose_encoder_.theta+M_PI), 0, dt*tan(angle_center)/wheelbase, (v)*dt / (wheelbase *cos(angle_center)*cos(angle_center)));
-        }
-        M = cv::Matx<double, 2, 2> (alpha_1*v*v + alpha_2*angle_center*angle_center, 0, 0, alpha_3*v*v + alpha_4*angle_center*angle_center);
-
-        // inital matrix needs to be set
-        if ( P(0,0)==0 || P(1,1)==0 || P(2,2)==0 ) ResetMatrix();
-        // anglar.x is abused to get cheap communication with the controller
-        if ( reset == true ) ResetMatrix();
-
-        P = (G*P*G.t()+V*M*V.t());
-
-        pose_encoder_.x = pose_encoder_.x + dx;
-        pose_encoder_.y = pose_encoder_.y + dy;
-        pose_encoder_.theta = pose_encoder_.theta + dtheta;
-
-        tf::Quaternion qt;
-        tf::Vector3 vt;
-
-        qt.setRPY( 0,0,pose_encoder_.theta);
-        vt = tf::Vector3 ( pose_encoder_.x, pose_encoder_.y, 0 );
-
-        if (reset == false) {
-            odometry_encoder_.pose.pose.position.x = vt.x();
-            odometry_encoder_.pose.pose.position.y = vt.y();
-            odometry_encoder_.pose.pose.position.z = vt.z();
-
-            odometry_encoder_.pose.pose.orientation.x = qt.x();
-            odometry_encoder_.pose.pose.orientation.y = qt.y();
-            odometry_encoder_.pose.pose.orientation.z = qt.z();
-            odometry_encoder_.pose.pose.orientation.w = qt.w();
-
-            odometry_encoder_.twist.twist.angular.z = w;
-            odometry_encoder_.twist.twist.linear.x = dx/seconds_since_last_update;
-            odometry_encoder_.twist.twist.linear.y = dy/seconds_since_last_update;
-        }
-        // getting data form encoder integration
-        qt = tf::Quaternion (	odometry_encoder_.pose.pose.orientation.x,
-                                 odometry_encoder_.pose.pose.orientation.y,
-                                 odometry_encoder_.pose.pose.orientation.z,
-                                 odometry_encoder_.pose.pose.orientation.w );
-        vt = tf::Vector3 (	odometry_encoder_.pose.pose.position.x,
-                              odometry_encoder_.pose.pose.position.y,
-                              odometry_encoder_.pose.pose.position.z );
-
-        tf::Transform base_footprint_to_odom ( qt, vt );
-        transform_broadcaster_->sendTransform (	tf::StampedTransform ( base_footprint_to_odom , current_time , odom_frame, base_footprint_frame ) );
-
-        // covariance
-        odometry_encoder_.pose.covariance[ 0+0] = P(0,0);
-        odometry_encoder_.pose.covariance[ 0+1] = P(0,1);
-        odometry_encoder_.pose.covariance[ 6+0] = P(1,0);
-        odometry_encoder_.pose.covariance[ 6+1] = P(1,1);
-        odometry_encoder_.pose.covariance[12+2] = 0.1;
-        odometry_encoder_.pose.covariance[18+3] = 0.01;
-        odometry_encoder_.pose.covariance[24+4] = 0.01;
-        odometry_encoder_.pose.covariance[30+5] = 0.01;
-
-        // set header
-        odometry_encoder_.header.stamp = current_time;
-        odometry_encoder_.header.frame_id = odom_frame;
-        odometry_encoder_.child_frame_id = base_footprint_frame;
-
-        // publish encoder odometry
-        odometry_publisher_encoder_.publish ( odometry_encoder_ );
-    }
-    void Ackermannplugin_IWS::ResetMatrix () {
-        P(0,0) = 0.1;
-        P(1,1) = 0.1;
-        P(2,2) = 0.1;
-    }
 
     GZ_REGISTER_MODEL_PLUGIN(Ackermannplugin_IWS)
 }

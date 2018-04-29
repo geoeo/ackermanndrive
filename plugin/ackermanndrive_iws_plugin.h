@@ -35,7 +35,6 @@
 
 
 namespace gazebo {
-    class Joint;
     class Ackermannplugin_IWS : public ModelPlugin {
     public:
         Ackermannplugin_IWS();		//Constructor
@@ -56,7 +55,7 @@ namespace gazebo {
         double track;
         double steeringwidth;
         double wheeldiameter;
-        double steeringfactor;
+        double steeringVelocity;
         double streeringtorque;
         double wheeltorque;
         double steeringangle;
@@ -71,8 +70,6 @@ namespace gazebo {
         std::string odometry_topic_godview_;
         ros::Subscriber command_subscriber_;
         ros::Subscriber command_subscriber_iws_;
-        ros::Publisher odometry_publisher_encoder_;
-        ros::Publisher odometry_publisher_godview_;
 
         // Custom Callback Queue
         ros::CallbackQueue queue_;
@@ -83,45 +80,33 @@ namespace gazebo {
         void cmdIWSCallback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg);
 
         void UpdateChild();
+        double roundTo(double value, int decimal_places);
 
         //Odometry
         double v;
         double w;
-        void PublishOdometryEncoder(double step_time);
-        void PublishOdometryGodview(double step_time);
-        geometry_msgs::Pose2D pose_encoder_;
-        nav_msgs::Odometry odometry_encoder_;
-        nav_msgs::Odometry odometry_godview_;
 
-        void ResetMatrix();
+
         bool reset;
 
-        cv::Matx<double, 3, 3> G;
-        cv::Matx<double, 3, 2> V;
-        cv::Matx<double, 2, 2> M;
-        cv::Matx<double, 3, 3> P;
-        cv::Matx<double, 3, 3> Pp;
 
         std::string odometry_frame_;
         std::string robot_base_frame_;
-        boost::shared_ptr<tf::TransformBroadcaster> transform_broadcaster_;
 
         //Update
         double update_rate_;
         double update_period_;
         common::Time last_update_time_;
-        common::Time last_odom_update_;
-
-        double target_velocity;
-        double angle_center;
 
         double wheel_velocity;
         double steering_omega;
 
-        double curve_radius;
+        double target_velocity;
+        double angle_center;
+
+
         double actual_angle_[2];
-        double target_angle_[2];
-        double direction_[2];
+
     };
 }
 
