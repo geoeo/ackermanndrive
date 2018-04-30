@@ -54,11 +54,12 @@ namespace gazebo {
         double wheelbase;
         double track;
         double steeringwidth;
-        double wheeldiameter;
-        double steeringVelocity;
+        double wheel_diameter;
+        double steering_velocity;
         double streeringtorque;
         double wheeltorque;
-        double steeringangle;
+        double max_steering_angle;
+        double max_revolute_velocity;
 
         //Joints
         std::vector<physics::JointPtr> steerings_;
@@ -81,6 +82,8 @@ namespace gazebo {
 
         void UpdateChild();
         double roundTo(double value, int decimal_places);
+        bool IsBetween(double value, double min, double max);
+
 
         //Odometry
         double v;
@@ -100,12 +103,14 @@ namespace gazebo {
 
         double wheel_velocity;
         double steering_omega;
+        double steering_angle;
 
         double target_velocity;
         double angle_center;
 
 
         double actual_angle_[2];
+        double actual_velocity[2];
 
     };
 }
