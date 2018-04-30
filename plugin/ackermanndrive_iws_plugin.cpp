@@ -125,8 +125,8 @@ namespace gazebo {
         actual_velocity[RIGHT] = steerings_[RIGHT] -> GetVelocity(0);
 
         // round to 1 d.p to avoid numerical errors
-        actual_angle_[LEFT ] = roundTo(actual_angle_[LEFT ],1);
-        actual_angle_[RIGHT ] = roundTo(actual_angle_[RIGHT ],1);
+        actual_angle_[LEFT ] = roundTo(actual_angle_[LEFT ],2);
+        actual_angle_[RIGHT ] = roundTo(actual_angle_[RIGHT ],2);
 
         actual_velocity[LEFT ] = roundTo(actual_velocity[LEFT ],1);
         actual_velocity[RIGHT ] = roundTo(actual_velocity[RIGHT ],1);
@@ -157,8 +157,8 @@ namespace gazebo {
         //delta_omega_[LEFT ] = steering_angle != 0.0 ? steering_velocity : actual_angle_[LEFT ] <= -0.1 || actual_angle_[LEFT ] >= 0.1 ? -steering_velocity: 0.0;
         //delta_omega_[RIGHT] =  steering_angle != 0.0  ? steering_velocity : actual_angle_[RIGHT ] <= -0.1 || actual_angle_[RIGHT ] >= 0.1 ?  -steering_velocity : 0.0;
 
-        delta_omega_[LEFT] = steering_angle != 0.0 ? steering_omega : !IsBetween(actual_angle_[LEFT ],-0.1,0.1) ? -steering_back_left : 0.0;
-        delta_omega_[RIGHT] = steering_angle != 0.0 ? steering_omega :  !IsBetween(actual_angle_[RIGHT ],-0.1,0.1) ? -steering_back_right : 0.0;
+        delta_omega_[LEFT] = steering_angle != 0.0 ? steering_omega : !IsBetween(actual_angle_[LEFT ],-0.01,0.01) ? -steering_back_left : 0.0;
+        delta_omega_[RIGHT] = steering_angle != 0.0 ? steering_omega :  !IsBetween(actual_angle_[RIGHT ],-0.01,0.01) ? -steering_back_right : 0.0;
 
 
         if(gazebo_debug){
