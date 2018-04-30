@@ -36,6 +36,7 @@ namespace gazebo {
         gazebo_ros_ -> getParameter<double> ( max_steering_angle, 		"MaxSteeringAngle",	0.0  );
         gazebo_ros_ -> getParameter<double> ( max_revolute_velocity, 		"MaxVelocityRevolute",	1.0  );
         gazebo_ros_ -> getParameter<double> ( max_steering_omega, 		"MaxSteeringOmega",	10.0  );
+        gazebo_ros_ -> getParameter<double> ( steering_acceleration, 		"SteeringAcceleration",	1.0  );
         gazebo_ros_ -> getParameter<double> ( wheeltorque,			"Wheeltorque",	10.0 );
         gazebo_ros_ -> getParameter<bool> ( gazebo_debug,			"GazeboDebug",	false );
 
@@ -134,7 +135,6 @@ namespace gazebo {
         if(steering_angle_ > max_steering_angle) steering_angle_ = max_steering_angle;
         else if(steering_angle_ < -max_steering_angle) steering_angle_ = -max_steering_angle;
 
-        //steering_omega_ = steering_velocity*sin(steering_angle_)/wheelbase;
         steering_omega_ = OmegaFromTricicleModel(steering_angle_);
 
         if(steering_omega_ > max_steering_omega) steering_omega_ = max_steering_omega;
@@ -156,8 +156,11 @@ namespace gazebo {
         //delta_omega_[LEFT ] = steering_angle != 0.0 ? steering_velocity : actual_angle_[LEFT ] <= -0.1 || actual_angle_[LEFT ] >= 0.1 ? -steering_velocity: 0.0;
         //delta_omega_[RIGHT] =  steering_angle != 0.0  ? steering_velocity : actual_angle_[RIGHT ] <= -0.1 || actual_angle_[RIGHT ] >= 0.1 ?  -steering_velocity : 0.0;
 
-        omega[LEFT] = steering_angle_ != 0.0 ? steering_omega_ : !IsBetween(actual_angle_[LEFT ],-0.01,0.01) ? -steering_back_left : 0.0;
-        omega[RIGHT] = steering_angle_ != 0.0 ? steering_omega_ :  !IsBetween(actual_angle_[RIGHT ],-0.01,0.01) ? -steering_back_right : 0.0;
+        //omega[LEFT] = steering_angle_ != 0.0 ? steering_omega_ : !IsBetween(actual_angle_[LEFT ],-0.01,0.01) ? -steering_back_left : 0.0;
+        //omega[RIGHT] = steering_angle_ != 0.0 ? steering_omega_ :  !IsBetween(actual_angle_[RIGHT ],-0.01,0.01) ? -steering_back_right : 0.0;
+
+        omega[LEFT] = steering_angle_ != 0.0 ? OmegaFromAccelerationModel(actual_velocity[LEFT],steering_omega_) : !IsBetween(actual_angle_[LEFT ],-0.01,0.01) ? -steering_back_left : 0.0;
+        omega[RIGHT] = steering_angle_ != 0.0 ? OmegaFromAccelerationModel(actual_velocity[RIGHT],steering_omega_) :  !IsBetween(actual_angle_[RIGHT ],-0.01,0.01) ? -steering_back_right : 0.0;
 
 
         if(gazebo_debug){
@@ -181,6 +184,21 @@ namespace gazebo {
 
     double Ackermannplugin_IWS::OmegaFromTricicleModel(double steering_angle) {
         return steering_velocity*sin(steering_angle)/wheelbase;
+    }
+
+    double Ackermannplugin_IWS::OmegaFromAccelerationModel(double current_wheel_velocity, double target_wheel_velocity) {
+        double eta = 0.1;
+        double diff = current_wheel_velocity - target_wheel_velocity;
+        double computed_velocity = target_wheel_velocity;
+
+        if(fabs(diff) > eta){
+            if(diff > 0.0)
+                computed_velocity = target_wheel_velocity + steering_acceleration;
+            else if (diff < 0.0)
+                computed_velocity = target_wheel_velocity - steering_acceleration;
+        }
+
+        return computed_velocity;
     }
 
     double Ackermannplugin_IWS::RoundTo(double value, int decimal_places) {

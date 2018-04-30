@@ -61,6 +61,7 @@ namespace gazebo {
         double max_steering_angle;
         double max_revolute_velocity;
         double max_steering_omega;
+        double steering_acceleration;
 
         //Joints
         std::vector<physics::JointPtr> steerings_;
@@ -84,19 +85,16 @@ namespace gazebo {
         void UpdateChild();
 
         double OmegaFromTricicleModel(double steering_angle);
-        double OmegaFromAccelerationModel(double steering_angle, double current_wheel_velocity);
+        double OmegaFromAccelerationModel(double current_wheel_velocity, double target_wheel_velocity);
 
         double RoundTo(double value, int decimal_places);
         bool IsBetween(double value, double min, double max);
-
 
         //Odometry
         double v;
         double w;
 
-
         bool reset;
-
 
         std::string odometry_frame_;
         std::string robot_base_frame_;
