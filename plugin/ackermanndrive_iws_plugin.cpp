@@ -23,6 +23,7 @@ namespace gazebo {
 
         // getting parameters from plugin.xacro
         gazebo_ros_ -> getParameter<std::string> ( command_topic_, "CommandTopic", "command" );
+        gazebo_ros_ -> getParameter<std::string> ( joint_iws_topic, "IWSTopic", "joint_iws_pub" );
         gazebo_ros_ -> getParameter<std::string> ( odometry_topic_encoder_, "OdometryTopicEncoder", "odometry_encoder" );
         gazebo_ros_ -> getParameter<std::string> ( odometry_topic_godview_, "OdometryTopicGodview", "odometry_godview" );
         gazebo_ros_ -> getParameter<std::string> ( odometry_frame_, 	"odometryFrame", "odom" );
@@ -67,17 +68,42 @@ namespace gazebo {
         //command_subscriber_ = gazebo_ros_->node()->subscribe(so_twist);
         command_subscriber_iws_ = gazebo_ros_->node()->subscribe(so_iws);
 
+        // rostopic publisher
+        joint_iws_publisher_ = gazebo_ros_->node()->advertise<tuw_nav_msgs::JointsIWS>(joint_iws_topic,1);
+
         // start custom queue
         this->callback_queue_thread_ = boost::thread ( boost::bind ( &Ackermannplugin_IWS::QueueThread, this ) );
 
         // listen to the update event (broadcast every simulation iteration)
         this->update_connection_  = event::Events::ConnectWorldUpdateBegin ( boost::bind ( &Ackermannplugin_IWS::UpdateChild, this ) );
 
+
         steering_angle_ = 0.0;
         steering_omega_ = 0.0;
+        wheel_velocity_ = 0.0;
+
+        cmd_iws_publish_.header.seq = 0;
+        cmd_iws_publish_.header.stamp = ros::Time::now();
+        cmd_iws_publish_.type_steering = "measures_steering";
+        cmd_iws_publish_.type_revolute = "measures_velocity";
+        cmd_iws_publish_.revolute.resize (2);
+        cmd_iws_publish_.steering.resize (2);
+        cmd_iws_publish_.steering[0] = steering_angle_;
+        cmd_iws_publish_.revolute[0] = std::nan("1");
+        cmd_iws_publish_.steering[1] = std::nan("1");
+        cmd_iws_publish_.revolute[1] = wheel_velocity_;
+        joint_iws_publisher_.publish (cmd_iws_publish_);
+
         ROS_INFO("Ackermann Drive IWS Plugin loaded!");
         ROS_INFO("Wheel base: %f", wheelbase);
         ROS_INFO("Steering Velocity %f", steering_velocity);
+    }
+
+    void Ackermannplugin_IWS::QueueThread () {
+        static const double timeout = 0.01;
+        while ( gazebo_ros_->node()->ok() ) {
+            queue_.callAvailable ( ros::WallDuration ( timeout ) );
+        }
     }
 
     void Ackermannplugin_IWS::cmdVelCallback ( const geometry_msgs::Twist::ConstPtr& cmd_msg ) {
@@ -104,18 +130,20 @@ namespace gazebo {
     }
 
     void Ackermannplugin_IWS::UpdateChild() {
+        //TODO Investigate Locking due to potential Callback Race condtions
 
         // wheelcontroll
         //double velocity = target_velocity / ( wheeldiameter / 2.0 );
-        double velocity = wheel_velocity_ / (wheel_diameter / 2.0 );
+        //double velocity = wheel_velocity_ / (wheel_diameter / 2.0 );
+        wheel_velocity_ /= wheel_diameter / 2.0;
 
-        if(velocity > max_revolute_velocity)
-            velocity = max_revolute_velocity;
-        else if (velocity < -max_revolute_velocity)
-            velocity = -max_revolute_velocity;
+        if(wheel_velocity_ > max_revolute_velocity)
+            wheel_velocity_ = max_revolute_velocity;
+        else if (wheel_velocity_ < -max_revolute_velocity)
+            wheel_velocity_ = -max_revolute_velocity;
 
-        wheels_[LEFT ] -> SetParam( "vel", 0, velocity );
-        wheels_[RIGHT] -> SetParam( "vel", 0, velocity );
+        wheels_[LEFT ] -> SetParam( "vel", 0, wheel_velocity_ );
+        wheels_[RIGHT] -> SetParam( "vel", 0, wheel_velocity_ );
 
         // steering control
         actual_angle_[LEFT ] = steerings_[LEFT ] -> GetAngle(0).Radian();
@@ -153,8 +181,6 @@ namespace gazebo {
         double omega[2];
 
         // Corrects back to 0 angle if steering = 0
-        //delta_omega_[LEFT ] = steering_angle != 0.0 ? steering_velocity : actual_angle_[LEFT ] <= -0.1 || actual_angle_[LEFT ] >= 0.1 ? -steering_velocity: 0.0;
-        //delta_omega_[RIGHT] =  steering_angle != 0.0  ? steering_velocity : actual_angle_[RIGHT ] <= -0.1 || actual_angle_[RIGHT ] >= 0.1 ?  -steering_velocity : 0.0;
 
         //omega[LEFT] = steering_angle_ != 0.0 ? steering_omega_ : !IsBetween(actual_angle_[LEFT ],-0.01,0.01) ? -steering_back_left : 0.0;
         //omega[RIGHT] = steering_angle_ != 0.0 ? steering_omega_ :  !IsBetween(actual_angle_[RIGHT ],-0.01,0.01) ? -steering_back_right : 0.0;
@@ -173,13 +199,8 @@ namespace gazebo {
         steerings_[RIGHT]->SetParam("vel", 0, omega[RIGHT]);
 
         last_update_time_ = last_update_time_ + common::Time ( update_period_ );
-    }
 
-    void Ackermannplugin_IWS::QueueThread () {
-        static const double timeout = 0.01;
-        while ( gazebo_ros_->node()->ok() ) {
-            queue_.callAvailable ( ros::WallDuration ( timeout ) );
-        }
+        PublishJointIWS();
     }
 
     double Ackermannplugin_IWS::OmegaFromTricicleModel(double steering_angle) {
@@ -209,6 +230,16 @@ namespace gazebo {
 
     bool Ackermannplugin_IWS::IsBetween(double value, double min, double max){
         return value < max && value > min;
+    }
+
+    void Ackermannplugin_IWS::PublishJointIWS() {
+        cmd_iws_publish_.header.seq++;
+        cmd_iws_publish_.header.stamp = ros::Time::now();
+
+        cmd_iws_publish_.steering[0] = steering_angle_;
+        cmd_iws_publish_.revolute[1] = wheel_velocity_;
+
+        joint_iws_publisher_.publish (cmd_iws_publish_);
     }
 
 

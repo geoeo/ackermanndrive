@@ -69,10 +69,17 @@ namespace gazebo {
 
         //Rostopic
         std::string command_topic_;
+        std::string joint_iws_topic;
         std::string odometry_topic_encoder_;
         std::string odometry_topic_godview_;
+
+        // ROS Pub/Subscribe
         ros::Subscriber command_subscriber_;
         ros::Subscriber command_subscriber_iws_;
+
+        ros::Publisher joint_iws_publisher_;
+
+        tuw_nav_msgs::JointsIWS cmd_iws_publish_;
 
         // Custom Callback Queue
         ros::CallbackQueue queue_;
@@ -81,6 +88,7 @@ namespace gazebo {
 
         void cmdVelCallback(const geometry_msgs::Twist::ConstPtr& cmd_msg);
         void cmdIWSCallback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg);
+        void PublishJointIWS();
 
         void UpdateChild();
 
