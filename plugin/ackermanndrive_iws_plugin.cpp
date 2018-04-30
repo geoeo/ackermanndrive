@@ -35,6 +35,7 @@ namespace gazebo {
         gazebo_ros_ -> getParameter<double> ( streeringtorque, 		"Streeringtorque",	10.0 );
         gazebo_ros_ -> getParameter<double> ( max_steering_angle, 		"MaxSteeringAngle",	0.0  );
         gazebo_ros_ -> getParameter<double> ( max_revolute_velocity, 		"MaxVelocityRevolute",	1.0  );
+        gazebo_ros_ -> getParameter<double> ( max_steering_omega, 		"MaxSteeringOmega",	10.0  );
         gazebo_ros_ -> getParameter<double> ( wheeltorque,			"Wheeltorque",	10.0 );
         gazebo_ros_ -> getParameter<bool> ( gazebo_debug,			"GazeboDebug",	false );
 
@@ -97,6 +98,7 @@ namespace gazebo {
 
         wheel_velocity = cmd_msg->revolute[1];
         steering_angle = cmd_msg->steering[0];
+        //ROS_INFO("IWS RECEIVED");
 
     }
 
@@ -134,6 +136,10 @@ namespace gazebo {
         else if(steering_angle < -max_steering_angle) steering_angle = -max_steering_angle;
 
         steering_omega = steering_velocity*sin(steering_angle)/wheelbase;
+
+        if(steering_omega > max_steering_omega) steering_omega = max_steering_omega;
+        else if (steering_omega < -max_steering_omega) steering_omega = -max_steering_omega;
+
         double steering_back_left = steering_velocity*sin(actual_angle_[LEFT ]);
         double steering_back_right = steering_velocity*sin(actual_angle_[RIGHT ]);
 

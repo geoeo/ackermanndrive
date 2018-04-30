@@ -60,6 +60,7 @@ namespace gazebo {
         double wheeltorque;
         double max_steering_angle;
         double max_revolute_velocity;
+        double max_steering_omega;
 
         //Joints
         std::vector<physics::JointPtr> steerings_;
