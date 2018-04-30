@@ -82,7 +82,11 @@ namespace gazebo {
         void cmdIWSCallback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg);
 
         void UpdateChild();
-        double roundTo(double value, int decimal_places);
+
+        double OmegaFromTricicleModel(double steering_angle);
+        double OmegaFromAccelerationModel(double steering_angle, double current_wheel_velocity);
+
+        double RoundTo(double value, int decimal_places);
         bool IsBetween(double value, double min, double max);
 
 
@@ -102,13 +106,12 @@ namespace gazebo {
         double update_period_;
         common::Time last_update_time_;
 
-        double wheel_velocity;
-        double steering_omega;
-        double steering_angle;
+        double wheel_velocity_;
+        double steering_omega_;
+        double steering_angle_;
 
         double target_velocity;
         double angle_center;
-
 
         double actual_angle_[2];
         double actual_velocity[2];

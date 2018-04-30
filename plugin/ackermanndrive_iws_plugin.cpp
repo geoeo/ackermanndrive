@@ -62,7 +62,7 @@ namespace gazebo {
 
         // rostopic subscriber
         ros::SubscribeOptions so_twist = ros::SubscribeOptions::create<geometry_msgs::Twist>(command_topic_, 1, boost::bind(&Ackermannplugin_IWS::cmdVelCallback, this, _1), ros::VoidPtr(), &queue_);
-        ros::SubscribeOptions so_iws = ros::SubscribeOptions::create<tuw_nav_msgs::JointsIWS>(command_topic_, 1, boost::bind(&Ackermannplugin_IWS::cmdIWSCallback, this, _1), ros::VoidPtr(), &queue_); //TODO:Queue
+        ros::SubscribeOptions so_iws = ros::SubscribeOptions::create<tuw_nav_msgs::JointsIWS>(command_topic_, 1, boost::bind(&Ackermannplugin_IWS::cmdIWSCallback, this, _1), ros::VoidPtr(), &queue_);
         //command_subscriber_ = gazebo_ros_->node()->subscribe(so_twist);
         command_subscriber_iws_ = gazebo_ros_->node()->subscribe(so_iws);
 
@@ -72,8 +72,8 @@ namespace gazebo {
         // listen to the update event (broadcast every simulation iteration)
         this->update_connection_  = event::Events::ConnectWorldUpdateBegin ( boost::bind ( &Ackermannplugin_IWS::UpdateChild, this ) );
 
-        steering_angle = 0.0;
-        steering_omega = 0.0;
+        steering_angle_ = 0.0;
+        steering_omega_ = 0.0;
         ROS_INFO("Ackermann Drive IWS Plugin loaded!");
         ROS_INFO("Wheel base: %f", wheelbase);
         ROS_INFO("Steering Velocity %f", steering_velocity);
@@ -96,8 +96,8 @@ namespace gazebo {
     void Ackermannplugin_IWS::cmdIWSCallback ( const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg ) {
         boost::mutex::scoped_lock scoped_lock ( IWS_message_lock );
 
-        wheel_velocity = cmd_msg->revolute[1];
-        steering_angle = cmd_msg->steering[0];
+        wheel_velocity_ = cmd_msg->revolute[1];
+        steering_angle_ = cmd_msg->steering[0];
         //ROS_INFO("IWS RECEIVED");
 
     }
@@ -106,7 +106,7 @@ namespace gazebo {
 
         // wheelcontroll
         //double velocity = target_velocity / ( wheeldiameter / 2.0 );
-        double velocity = wheel_velocity / (wheel_diameter / 2.0 );
+        double velocity = wheel_velocity_ / (wheel_diameter / 2.0 );
 
         if(velocity > max_revolute_velocity)
             velocity = max_revolute_velocity;
@@ -116,7 +116,6 @@ namespace gazebo {
         wheels_[LEFT ] -> SetParam( "vel", 0, velocity );
         wheels_[RIGHT] -> SetParam( "vel", 0, velocity );
 
-
         // steering control
         actual_angle_[LEFT ] = steerings_[LEFT ] -> GetAngle(0).Radian();
         actual_angle_[RIGHT] = steerings_[RIGHT] -> GetAngle(0).Radian();
@@ -125,20 +124,21 @@ namespace gazebo {
         actual_velocity[RIGHT] = steerings_[RIGHT] -> GetVelocity(0);
 
         // round to 1 d.p to avoid numerical errors
-        actual_angle_[LEFT ] = roundTo(actual_angle_[LEFT ],2);
-        actual_angle_[RIGHT ] = roundTo(actual_angle_[RIGHT ],2);
+        actual_angle_[LEFT ] = RoundTo(actual_angle_[LEFT ],2);
+        actual_angle_[RIGHT ] = RoundTo(actual_angle_[RIGHT ],2);
 
-        actual_velocity[LEFT ] = roundTo(actual_velocity[LEFT ],1);
-        actual_velocity[RIGHT ] = roundTo(actual_velocity[RIGHT ],1);
+        actual_velocity[LEFT ] = RoundTo(actual_velocity[LEFT ],1);
+        actual_velocity[RIGHT ] = RoundTo(actual_velocity[RIGHT ],1);
 
         // limit angle based on config settings
-        if(steering_angle > max_steering_angle) steering_angle = max_steering_angle;
-        else if(steering_angle < -max_steering_angle) steering_angle = -max_steering_angle;
+        if(steering_angle_ > max_steering_angle) steering_angle_ = max_steering_angle;
+        else if(steering_angle_ < -max_steering_angle) steering_angle_ = -max_steering_angle;
 
-        steering_omega = steering_velocity*sin(steering_angle)/wheelbase;
+        //steering_omega_ = steering_velocity*sin(steering_angle_)/wheelbase;
+        steering_omega_ = OmegaFromTricicleModel(steering_angle_);
 
-        if(steering_omega > max_steering_omega) steering_omega = max_steering_omega;
-        else if (steering_omega < -max_steering_omega) steering_omega = -max_steering_omega;
+        if(steering_omega_ > max_steering_omega) steering_omega_ = max_steering_omega;
+        else if (steering_omega_ < -max_steering_omega) steering_omega_ = -max_steering_omega;
 
         double steering_back_left = steering_velocity*sin(actual_angle_[LEFT ]);
         double steering_back_right = steering_velocity*sin(actual_angle_[RIGHT ]);
@@ -146,29 +146,28 @@ namespace gazebo {
         if(gazebo_debug){
             ROS_INFO("left angle: %f",actual_angle_[LEFT ]);
             ROS_INFO("right angle: %f",actual_angle_[RIGHT ]);
-            ROS_INFO("steering omega: %f",steering_omega);
-            ROS_INFO("steering angle: %f",steering_angle);
+            ROS_INFO("steering omega: %f",steering_omega_);
+            ROS_INFO("steering angle: %f",steering_angle_);
         }
 
-        double delta_omega_[2];
-
+        double omega[2];
 
         // Corrects back to 0 angle if steering = 0
         //delta_omega_[LEFT ] = steering_angle != 0.0 ? steering_velocity : actual_angle_[LEFT ] <= -0.1 || actual_angle_[LEFT ] >= 0.1 ? -steering_velocity: 0.0;
         //delta_omega_[RIGHT] =  steering_angle != 0.0  ? steering_velocity : actual_angle_[RIGHT ] <= -0.1 || actual_angle_[RIGHT ] >= 0.1 ?  -steering_velocity : 0.0;
 
-        delta_omega_[LEFT] = steering_angle != 0.0 ? steering_omega : !IsBetween(actual_angle_[LEFT ],-0.01,0.01) ? -steering_back_left : 0.0;
-        delta_omega_[RIGHT] = steering_angle != 0.0 ? steering_omega :  !IsBetween(actual_angle_[RIGHT ],-0.01,0.01) ? -steering_back_right : 0.0;
+        omega[LEFT] = steering_angle_ != 0.0 ? steering_omega_ : !IsBetween(actual_angle_[LEFT ],-0.01,0.01) ? -steering_back_left : 0.0;
+        omega[RIGHT] = steering_angle_ != 0.0 ? steering_omega_ :  !IsBetween(actual_angle_[RIGHT ],-0.01,0.01) ? -steering_back_right : 0.0;
 
 
         if(gazebo_debug){
-            ROS_INFO("delta omega left: %f",delta_omega_[LEFT ]);
-            ROS_INFO("delta omega right: %f",delta_omega_[RIGHT ]);
+            ROS_INFO("delta omega left: %f" ,omega[LEFT ]);
+            ROS_INFO("delta omega right: %f", omega[RIGHT ]);
         }
 
 
-        steerings_[LEFT ]->SetParam("vel", 0, delta_omega_[LEFT ]);
-        steerings_[RIGHT]->SetParam("vel", 0, delta_omega_[RIGHT]);
+        steerings_[LEFT ]->SetParam("vel", 0, omega[LEFT ]);
+        steerings_[RIGHT]->SetParam("vel", 0, omega[RIGHT]);
 
         last_update_time_ = last_update_time_ + common::Time ( update_period_ );
     }
@@ -180,7 +179,11 @@ namespace gazebo {
         }
     }
 
-    double Ackermannplugin_IWS::roundTo(double value, int decimal_places) {
+    double Ackermannplugin_IWS::OmegaFromTricicleModel(double steering_angle) {
+        return steering_velocity*sin(steering_angle)/wheelbase;
+    }
+
+    double Ackermannplugin_IWS::RoundTo(double value, int decimal_places) {
 
         double factor = pow(10.0,(double)decimal_places);
         return ceil(value*factor)/factor;
