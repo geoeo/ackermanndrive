@@ -38,6 +38,7 @@ namespace gazebo {
         gazebo_ros_ -> getParameter<double> ( max_revolute_velocity, 		"MaxVelocityRevolute",	1.0  );
         gazebo_ros_ -> getParameter<double> ( max_steering_omega, 		"MaxSteeringOmega",	10.0  );
         gazebo_ros_ -> getParameter<double> ( steering_acceleration, 		"SteeringAcceleration",	1.0  );
+        gazebo_ros_ -> getParameter<double> ( linear_acceleration, 		"LinearAcceleration",	1.0  );
         gazebo_ros_ -> getParameter<double> ( wheeltorque,			"Wheeltorque",	10.0 );
         gazebo_ros_ -> getParameter<bool> ( gazebo_debug,			"GazeboDebug",	false );
 
@@ -135,12 +136,33 @@ namespace gazebo {
         // wheelcontroll
         //double velocity = target_velocity / ( wheeldiameter / 2.0 );
         //double velocity = wheel_velocity_ / (wheel_diameter / 2.0 );
+
+
+
+
+
         wheel_velocity_ /= wheel_diameter / 2.0;
 
-        if(wheel_velocity_ > max_revolute_velocity)
-            wheel_velocity_ = max_revolute_velocity;
-        else if (wheel_velocity_ < -max_revolute_velocity)
-            wheel_velocity_ = -max_revolute_velocity;
+
+
+
+        //if(wheel_velocity_ > max_revolute_velocity)
+        //    wheel_velocity_ = max_revolute_velocity;
+        //else if (wheel_velocity_ < -max_revolute_velocity)
+        //    wheel_velocity_ = -max_revolute_velocity;
+
+        double actual_wheel_velocity = RoundTo(wheels_[LEFT]->GetVelocity(0),2);
+        wheel_velocity_ = RoundTo(wheel_velocity_,2);
+
+        if(gazebo_debug){
+            ROS_INFO("target wheel velocity: %f",wheel_velocity_);
+            ROS_INFO("actual wheel velocity: %f",actual_wheel_velocity);
+        }
+
+
+        // strange initialization bug, where velocity is not 0
+        if(fabs(wheel_velocity_) > 0.1)
+            wheel_velocity_ = CalculateVelocityWithAcceleration(actual_wheel_velocity,wheel_velocity_,linear_acceleration,max_revolute_velocity);
 
         wheels_[LEFT ] -> SetParam( "vel", 0, wheel_velocity_ );
         wheels_[RIGHT] -> SetParam( "vel", 0, wheel_velocity_ );
@@ -168,6 +190,8 @@ namespace gazebo {
         if(steering_omega_ > max_steering_omega) steering_omega_ = max_steering_omega;
         else if (steering_omega_ < -max_steering_omega) steering_omega_ = -max_steering_omega;
 
+        steering_omega_ = RoundTo(steering_omega_,1);
+
         double steering_back_left = steering_velocity*sin(actual_angle_[LEFT ]);
         double steering_back_right = steering_velocity*sin(actual_angle_[RIGHT ]);
 
@@ -182,11 +206,12 @@ namespace gazebo {
 
         // Corrects back to 0 angle if steering = 0
 
-        //omega[LEFT] = steering_angle_ != 0.0 ? steering_omega_ : !IsBetween(actual_angle_[LEFT ],-0.01,0.01) ? -steering_back_left : 0.0;
-        //omega[RIGHT] = steering_angle_ != 0.0 ? steering_omega_ :  !IsBetween(actual_angle_[RIGHT ],-0.01,0.01) ? -steering_back_right : 0.0;
+        omega[LEFT] = steering_angle_ != 0.0 ? steering_omega_ : !IsBetween(actual_angle_[LEFT ],-0.01,0.01) ? -steering_back_left : 0.0;
+        omega[RIGHT] = steering_angle_ != 0.0 ? steering_omega_ :  !IsBetween(actual_angle_[RIGHT ],-0.01,0.01) ? -steering_back_right : 0.0;
 
-        omega[LEFT] = steering_angle_ != 0.0 ? OmegaFromAccelerationModel(actual_velocity[LEFT],steering_omega_) : !IsBetween(actual_angle_[LEFT ],-0.01,0.01) ? -steering_back_left : 0.0;
-        omega[RIGHT] = steering_angle_ != 0.0 ? OmegaFromAccelerationModel(actual_velocity[RIGHT],steering_omega_) :  !IsBetween(actual_angle_[RIGHT ],-0.01,0.01) ? -steering_back_right : 0.0;
+        // seems to be more numerically instable for small angles
+        //omega[LEFT] = steering_angle_ != 0.0 ? CalculateVelocityWithAcceleration(actual_velocity[LEFT],steering_omega_,steering_acceleration,steering_velocity) : !IsBetween(actual_angle_[LEFT ],-0.1,0.01) ? CalculateVelocityWithAcceleration(actual_velocity[LEFT],-steering_back_left,steering_acceleration,steering_velocity) : 0.0;
+        //omega[RIGHT] = steering_angle_ != 0.0 ? CalculateVelocityWithAcceleration(actual_velocity[RIGHT],steering_omega_,steering_acceleration,steering_velocity) :  !IsBetween(actual_angle_[RIGHT ],-0.01,0.01) ?  CalculateVelocityWithAcceleration(actual_velocity[RIGHT],-steering_back_right,steering_acceleration,steering_velocity) : 0.0;
 
 
         if(gazebo_debug){
@@ -207,17 +232,22 @@ namespace gazebo {
         return steering_velocity*sin(steering_angle)/wheelbase;
     }
 
-    double Ackermannplugin_IWS::OmegaFromAccelerationModel(double current_wheel_velocity, double target_wheel_velocity) {
+    double Ackermannplugin_IWS::CalculateVelocityWithAcceleration(double current_velocity, double target_velocity, double acceleration, double limit) {
         double eta = 0.1;
-        double diff = current_wheel_velocity - target_wheel_velocity;
-        double computed_velocity = target_wheel_velocity;
+        double diff = current_velocity - target_velocity;
+        double computed_velocity = current_velocity;
 
         if(fabs(diff) > eta){
             if(diff > 0.0)
-                computed_velocity = target_wheel_velocity + steering_acceleration;
+                computed_velocity -= acceleration;
             else if (diff < 0.0)
-                computed_velocity = target_wheel_velocity - steering_acceleration;
+                computed_velocity += acceleration;
         }
+
+        computed_velocity = RoundTo(computed_velocity,2);
+
+        if(computed_velocity > limit) computed_velocity = limit;
+        else if(computed_velocity < -limit) computed_velocity = -limit;
 
         return computed_velocity;
     }
@@ -236,8 +266,11 @@ namespace gazebo {
         cmd_iws_publish_.header.seq++;
         cmd_iws_publish_.header.stamp = ros::Time::now();
 
-        cmd_iws_publish_.steering[0] = steering_angle_;
-        cmd_iws_publish_.revolute[1] = wheel_velocity_;
+        //cmd_iws_publish_.steering[0] = steering_angle_;
+        //cmd_iws_publish_.revolute[1] = wheel_velocity_;
+
+        cmd_iws_publish_.steering[0] = RoundTo(steerings_[LEFT ]->GetAngle(0).Radian(),2);
+        cmd_iws_publish_.revolute[1] = RoundTo(wheels_[LEFT ]->GetVelocity(0),1);
 
         joint_iws_publisher_.publish (cmd_iws_publish_);
     }

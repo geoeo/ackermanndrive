@@ -62,6 +62,7 @@ namespace gazebo {
         double max_revolute_velocity;
         double max_steering_omega;
         double steering_acceleration;
+        double linear_acceleration;
 
         //Joints
         std::vector<physics::JointPtr> steerings_;
@@ -93,7 +94,7 @@ namespace gazebo {
         void UpdateChild();
 
         double OmegaFromTricicleModel(double steering_angle);
-        double OmegaFromAccelerationModel(double current_wheel_velocity, double target_wheel_velocity);
+        double CalculateVelocityWithAcceleration(double current_velocity, double target_velocity, double acceleration,double limit);
 
         double RoundTo(double value, int decimal_places);
         bool IsBetween(double value, double min, double max);
