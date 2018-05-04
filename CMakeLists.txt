@@ -230,3 +230,6 @@ target_link_libraries(ackermanndrive_plugin ${GAZEBO_LIBRARIES} ${catkin_LIBRARI
 
 add_library(ackermanndrive_iws_plugin SHARED plugin/ackermanndrive_iws_plugin.cpp)
 target_link_libraries(ackermanndrive_iws_plugin ${GAZEBO_LIBRARIES} ${catkin_LIBRARIES} ${Boost_LIBRARIES})
+
+add_library(ackermann_iws_model SHARED plugin/ackermann_motion_model.cpp)
+target_link_libraries(ackermann_iws_model ${catkin_LIBRARIES} ${Boost_LIBRARIES})
