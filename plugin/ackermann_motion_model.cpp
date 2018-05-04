@@ -4,6 +4,8 @@
 
 #include "ackermann_motion_model.hpp"
 
+boost::mutex IWS_message_lock;
+tuw_nav_msgs::JointsIWS current_iws;
 
 // http://wiki.ros.org/navigation/Tutorials/RobotSetup/Odom
 
@@ -13,15 +15,17 @@ int main(int argc, char** argv){
     ros::NodeHandle n;
     ros::Publisher odom_pub = n.advertise<nav_msgs::Odometry>("odom", 50);
     tf::TransformBroadcaster odom_broadcaster;
-    ros::Subscriber iws_sub = n.subscribe(iws_channel,1,IWS_Callback);
+    ros::Subscriber iws_sub = n.subscribe("iws_channel",1,IWS_Callback);
 
-    double x = 0.0;
-    double y = 0.0;
-    double th = 0.0;
+    current_iws.revolute.resize (2);
+    current_iws.steering.resize (2);
+    current_iws.steering[0] = 0.0;
+    current_iws.revolute[0] = std::nan("1");
+    current_iws.steering[1] = std::nan("1");
+    current_iws.revolute[1] = 0.0;
 
-    double vx = 0.1;
-    double vy = -0.1;
-    double vth = 0.1;
+
+    Pose robotPose;
 
     ros::Time current_time, last_time;
     current_time = ros::Time::now();
@@ -35,25 +39,30 @@ int main(int argc, char** argv){
 
         //compute odometry in a typical way given the velocities of the robot
         double dt = (current_time - last_time).toSec();
-        double delta_x = (vx * cos(th) - vy * sin(th)) * dt;
-        double delta_y = (vx * sin(th) + vy * cos(th)) * dt;
-        double delta_th = vth * dt;
+        //double delta_x = (vx * cos(th) - vy * sin(th)) * dt;
+        //double delta_y = (vx * sin(th) + vy * cos(th)) * dt;
+        //double delta_th = vth * dt;
 
-        x += delta_x;
-        y += delta_y;
-        th += delta_th;
+        //x += delta_x;
+        //y += delta_y;
+        //th += delta_th;
+
+        MotionDelta motionDelta = CalculateAckermannMotionDelta(current_iws);
+
+        robotPose.ApplyMotion(motionDelta,dt);
+
 
         //since all odometry is 6DOF we'll need a quaternion created from yaw
-        geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(th);
+        geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(robotPose.theta);
 
         //first, we'll publish the transform over tf
         geometry_msgs::TransformStamped odom_trans;
         odom_trans.header.stamp = current_time;
         odom_trans.header.frame_id = "odom";
-        odom_trans.child_frame_id = child_frame;
+        odom_trans.child_frame_id = "base_link";
 
-        odom_trans.transform.translation.x = x;
-        odom_trans.transform.translation.y = y;
+        odom_trans.transform.translation.x = robotPose.x;
+        odom_trans.transform.translation.y = robotPose.y;
         odom_trans.transform.translation.z = 0.0;
         odom_trans.transform.rotation = odom_quat;
 
@@ -66,16 +75,16 @@ int main(int argc, char** argv){
         odom.header.frame_id = "odom";
 
         //set the position
-        odom.pose.pose.position.x = x;
-        odom.pose.pose.position.y = y;
+        odom.pose.pose.position.x = robotPose.x;
+        odom.pose.pose.position.y = robotPose.y;
         odom.pose.pose.position.z = 0.0;
         odom.pose.pose.orientation = odom_quat;
 
         //set the velocity
-        odom.child_frame_id = child_frame;
-        odom.twist.twist.linear.x = vx;
-        odom.twist.twist.linear.y = vy;
-        odom.twist.twist.angular.z = vth;
+        odom.child_frame_id = "base_link";
+        odom.twist.twist.linear.x = motionDelta.deltaX;
+        odom.twist.twist.linear.y = motionDelta.deltaY;
+        odom.twist.twist.angular.z = motionDelta.deltaY;
 
         //publish the message
         odom_pub.publish(odom);
@@ -91,13 +100,37 @@ void IWS_Callback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg){
 
     current_iws.revolute[1] = cmd_msg->revolute[1];
     current_iws.steering[0] = cmd_msg->steering[0];
+
+    //ROS_INFO("RECEIVED: %f",  current_iws.revolute[1]);
 }
 
-Motion_Delta CalculateMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
+MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
+    boost::mutex::scoped_lock scoped_lock ( IWS_message_lock );
+
 
     double linear_velocity = actionInputs.revolute[1];
     double steering_angle = actionInputs.steering[0];
 
+    MotionDelta motionDelta;
+
+    // Intro. SLAM by Juan-Antonio Fernandez p. 164
+    // Should be same error thresh. as in iws plugin
+    if(fabs(steering_angle) < 0.1){
+        motionDelta.deltaX = linear_velocity;
+        motionDelta.deltaY = 0.0;
+        motionDelta.deltaTheta = 0.0;
+    }
+
+    else {
+        motionDelta.deltaTheta = linear_velocity*sin(steering_angle)/wheel_base;
+        motionDelta.deltaX = wheel_base*sin(motionDelta.deltaTheta)/tan(steering_angle);
+        motionDelta.deltaY = wheel_base*(1.0-cos(motionDelta.deltaTheta)/tan(steering_angle));
+    }
+
+    return motionDelta;
+
 
 
 }
+
+

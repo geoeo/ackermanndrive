@@ -11,23 +11,38 @@
 #include <tuw_nav_msgs/JointsIWS.h>
 #include <boost/thread.hpp>
 
-struct Motion_Delta {
-    double deltaX;
-    double deltaY;
-    double deltaTheta;
+struct MotionDelta {
+    double deltaX = 0.0;
+    double deltaY = 0.0;
+    double deltaTheta = 0.0;
+};
+
+struct Pose {
+    double x = 0.0;
+    double y = 0.0;
+    double theta = 0.0;
+
+    void ApplyMotion(MotionDelta delta, double dt){
+
+        x = x + (delta.deltaX*cos(theta) - delta.deltaY*sin(theta))*dt;
+        y = y + (delta.deltaX*sin(theta) + delta.deltaY*cos(theta))*dt;
+        theta += delta.deltaTheta*dt;
+
+    }
 };
 
 
-boost::mutex IWS_message_lock;
 
-std::string child_frame = "base_link";
-std::string iws_channel = "iws_channel";
+
 
 void IWS_Callback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg);
 
-Motion_Delta CalculateMotionDelta(tuw_nav_msgs::JointsIWS actionInputs);
+MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs);
 
-tuw_nav_msgs::JointsIWS current_iws;
+Pose ApplyMotionToPose(Pose p, MotionDelta delta);
+
+
+double wheel_base = 0.26; //TODO: Get this from config
 
 
 #endif //PROJECT_ACKERMANN_MOTION_MODEL_HPP

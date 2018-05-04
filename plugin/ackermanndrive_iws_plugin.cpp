@@ -133,23 +133,7 @@ namespace gazebo {
     void Ackermannplugin_IWS::UpdateChild() {
         //TODO Investigate Locking due to potential Callback Race condtions
 
-        // wheelcontroll
-        //double velocity = target_velocity / ( wheeldiameter / 2.0 );
-        //double velocity = wheel_velocity_ / (wheel_diameter / 2.0 );
-
-
-
-
-
         wheel_velocity_ /= wheel_diameter / 2.0;
-
-
-
-
-        //if(wheel_velocity_ > max_revolute_velocity)
-        //    wheel_velocity_ = max_revolute_velocity;
-        //else if (wheel_velocity_ < -max_revolute_velocity)
-        //    wheel_velocity_ = -max_revolute_velocity;
 
         double actual_wheel_velocity = RoundTo(wheels_[LEFT]->GetVelocity(0),2);
         wheel_velocity_ = RoundTo(wheel_velocity_,2);
@@ -158,7 +142,6 @@ namespace gazebo {
             ROS_INFO("target wheel velocity: %f",wheel_velocity_);
             ROS_INFO("actual wheel velocity: %f",actual_wheel_velocity);
         }
-
 
         // strange initialization bug, where velocity is not 0
         if(fabs(wheel_velocity_) > 0.1)
