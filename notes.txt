@@ -1,0 +1,5 @@
+Ros GroundTruth Odometry Plugin
+
+http://answers.gazebosim.org/question/5308/getting-the-gazebo-plugin-p3d-working-hydro/
+http://docs.ros.org/electric/api/gazebo_plugins/html/gazebo__ros__p3d_8cpp_source.html
+http://sauravag.com/2017/06/how-to-get-ground-truth-pose-data-in-ros-gazebo/
