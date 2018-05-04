@@ -7,6 +7,13 @@
 boost::mutex IWS_message_lock;
 tuw_nav_msgs::JointsIWS current_iws;
 
+
+double RoundTo(double value, int decimal_places) {
+
+    double factor = pow(10.0,(double)decimal_places);
+    return ceil(value*factor)/factor;
+}
+
 // http://wiki.ros.org/navigation/Tutorials/RobotSetup/Odom
 
 int main(int argc, char** argv){
@@ -50,6 +57,7 @@ int main(int argc, char** argv){
         MotionDelta motionDelta = CalculateAckermannMotionDelta(current_iws);
 
         robotPose.ApplyMotion(motionDelta,dt);
+        //robotPose.ApplyMotion(motionDelta,1.0);
 
 
         //since all odometry is 6DOF we'll need a quaternion created from yaw
@@ -98,10 +106,11 @@ int main(int argc, char** argv){
 void IWS_Callback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg){
     boost::mutex::scoped_lock scoped_lock ( IWS_message_lock );
 
-    current_iws.revolute[1] = cmd_msg->revolute[1];
-    current_iws.steering[0] = cmd_msg->steering[0];
+    current_iws.revolute[1] = RoundTo(cmd_msg->revolute[1],1);
+    current_iws.steering[0] = RoundTo(cmd_msg->steering[0],2);
 
-    //ROS_INFO("RECEIVED: %f",  current_iws.revolute[1]);
+    ROS_INFO("RECEIVED: %f",  current_iws.revolute[1]);
+    ROS_INFO("Steering: %f",  current_iws.steering[0]);
 }
 
 MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
@@ -113,6 +122,8 @@ MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
 
     MotionDelta motionDelta;
 
+    double sin_steering = RoundTo(sin(steering_angle),1);
+
     // Intro. SLAM by Juan-Antonio Fernandez p. 164
     // Should be same error thresh. as in iws plugin
     if(fabs(steering_angle) < 0.1){
@@ -122,7 +133,7 @@ MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
     }
 
     else {
-        motionDelta.deltaTheta = linear_velocity*sin(steering_angle)/wheel_base;
+        motionDelta.deltaTheta = linear_velocity*sin_steering/wheel_base;
         motionDelta.deltaX = wheel_base*sin(motionDelta.deltaTheta)/tan(steering_angle);
         motionDelta.deltaY = wheel_base*(1.0-cos(motionDelta.deltaTheta)/tan(steering_angle));
     }
