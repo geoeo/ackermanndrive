@@ -39,14 +39,14 @@ int main(int argc, char** argv){
     current_time = ros::Time::now();
     last_time = ros::Time::now();
 
-    ros::Rate r(30.0);
+    ros::Rate r(100.0);
 
     // strange startup values
     ros::Duration(2).sleep();
     while(n.ok()){
 
         ros::spinOnce();              // check for incoming messages
-        //current_time = ros::Time::now();
+        current_time = ros::Time::now();
 
         if(!ableToCalculateDeltaTime)
             continue;
@@ -64,8 +64,13 @@ int main(int argc, char** argv){
 
         MotionDelta motionDelta = CalculateAckermannMotionDelta(current_iws);
 
+        //ROS_INFO("dt: %f",deltaTime);
+
         robotPose.ApplyMotion(motionDelta,deltaTime);
         //robotPose.ApplyMotion(motionDelta,1.0);
+
+        //ROS_INFO("new x: %f",robotPose.x);
+        //ROS_INFO("new y: %f",robotPose.y);
 
 
         //since all odometry is 6DOF we'll need a quaternion created from yaw
@@ -118,8 +123,9 @@ void IWS_Callback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg){
 
     current_iws.revolute[1] = RoundTo(cmd_msg->revolute[1],1);
     current_iws.steering[0] = RoundTo(cmd_msg->steering[0],2);
+    // skip first message
     if(!current_iws.header.stamp.isZero()){
-        deltaTime = (cmd_msg->header.stamp-current_iws.header.stamp).toSec();
+        deltaTime = (cmd_msg->header.stamp-current_iws.header.stamp).toSec()/gazebo_update_rate;
         ableToCalculateDeltaTime = true;
     }
     current_iws.header.stamp = cmd_msg->header.stamp;
@@ -148,10 +154,16 @@ MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
         motionDelta.deltaTheta = 0.0;
     }
 
-    else {
+    else if( fabs(linear_velocity) > 1.0){
         motionDelta.deltaTheta = linear_velocity*sin_steering/wheel_base;
         motionDelta.deltaX = wheel_base*sin(motionDelta.deltaTheta)/tan(steering_angle);
-        motionDelta.deltaY = wheel_base*(1.0-cos(motionDelta.deltaTheta)/tan(steering_angle));
+        motionDelta.deltaY = wheel_base*(1.0-cos(motionDelta.deltaTheta))/tan(steering_angle);
+    }
+
+    else {
+        motionDelta.deltaTheta = 0.0;
+        motionDelta.deltaX = 0.0;
+        motionDelta.deltaY = 0.0;
     }
 
     //ROS_INFO("dx: %f", motionDelta.deltaX);
