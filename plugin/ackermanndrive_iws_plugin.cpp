@@ -255,6 +255,9 @@ namespace gazebo {
         cmd_iws_publish_.steering[0] = RoundTo(steerings_[LEFT ]->GetAngle(0).Radian(),2);
         cmd_iws_publish_.revolute[1] = RoundTo(wheels_[LEFT ]->GetVelocity(0),1);
 
+        //ROS_INFO("Publishing steering: %f", cmd_iws_publish_.steering[0]);
+        //ROS_INFO("Publishing rev: %f", cmd_iws_publish_.revolute[1]);
+
         joint_iws_publisher_.publish (cmd_iws_publish_);
     }
 

@@ -43,6 +43,9 @@ Pose ApplyMotionToPose(Pose p, MotionDelta delta);
 
 
 double wheel_base = 0.26; //TODO: Get this from config
+double steering_velocity = 25.0;
+bool ableToCalculateDeltaTime = false;
+double deltaTime = 0.0;
 
 
 #endif //PROJECT_ACKERMANN_MOTION_MODEL_HPP

@@ -30,6 +30,7 @@ int main(int argc, char** argv){
     current_iws.revolute[0] = std::nan("1");
     current_iws.steering[1] = std::nan("1");
     current_iws.revolute[1] = 0.0;
+    current_iws.header.stamp = ros::Time(0);
 
 
     Pose robotPose;
@@ -38,14 +39,21 @@ int main(int argc, char** argv){
     current_time = ros::Time::now();
     last_time = ros::Time::now();
 
-    ros::Rate r(1.0);
+    ros::Rate r(30.0);
+
+    // strange startup values
+    ros::Duration(2).sleep();
     while(n.ok()){
 
-        ros::spinOnce();               // check for incoming messages
-        current_time = ros::Time::now();
+        ros::spinOnce();              // check for incoming messages
+        //current_time = ros::Time::now();
 
+        if(!ableToCalculateDeltaTime)
+            continue;
+
+        //TODO use time from header
         //compute odometry in a typical way given the velocities of the robot
-        double dt = (current_time - last_time).toSec();
+        //double dt = (current_time - last_time).toSec();
         //double delta_x = (vx * cos(th) - vy * sin(th)) * dt;
         //double delta_y = (vx * sin(th) + vy * cos(th)) * dt;
         //double delta_th = vth * dt;
@@ -56,7 +64,7 @@ int main(int argc, char** argv){
 
         MotionDelta motionDelta = CalculateAckermannMotionDelta(current_iws);
 
-        robotPose.ApplyMotion(motionDelta,dt);
+        robotPose.ApplyMotion(motionDelta,deltaTime);
         //robotPose.ApplyMotion(motionDelta,1.0);
 
 
@@ -66,21 +74,24 @@ int main(int argc, char** argv){
         //first, we'll publish the transform over tf
         geometry_msgs::TransformStamped odom_trans;
         odom_trans.header.stamp = current_time;
-        odom_trans.header.frame_id = "odom";
+        odom_trans.header.frame_id = "map";
         odom_trans.child_frame_id = "base_link";
 
         odom_trans.transform.translation.x = robotPose.x;
         odom_trans.transform.translation.y = robotPose.y;
+        //odom_trans.transform.translation.x = 0.0;
+        //odom_trans.transform.translation.y = 0.0;
         odom_trans.transform.translation.z = 0.0;
         odom_trans.transform.rotation = odom_quat;
 
         //send the transform
+
         odom_broadcaster.sendTransform(odom_trans);
 
         //next, we'll publish the odometry message over ROS
         nav_msgs::Odometry odom;
         odom.header.stamp = current_time;
-        odom.header.frame_id = "odom";
+        odom.header.frame_id = "map";
 
         //set the position
         odom.pose.pose.position.x = robotPose.x;
@@ -92,7 +103,7 @@ int main(int argc, char** argv){
         odom.child_frame_id = "base_link";
         odom.twist.twist.linear.x = motionDelta.deltaX;
         odom.twist.twist.linear.y = motionDelta.deltaY;
-        odom.twist.twist.angular.z = motionDelta.deltaY;
+        odom.twist.twist.angular.z = motionDelta.deltaTheta;
 
         //publish the message
         odom_pub.publish(odom);
@@ -104,13 +115,18 @@ int main(int argc, char** argv){
 
 
 void IWS_Callback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg){
-    boost::mutex::scoped_lock scoped_lock ( IWS_message_lock );
 
     current_iws.revolute[1] = RoundTo(cmd_msg->revolute[1],1);
     current_iws.steering[0] = RoundTo(cmd_msg->steering[0],2);
+    if(!current_iws.header.stamp.isZero()){
+        deltaTime = (cmd_msg->header.stamp-current_iws.header.stamp).toSec();
+        ableToCalculateDeltaTime = true;
+    }
+    current_iws.header.stamp = cmd_msg->header.stamp;
 
-    ROS_INFO("RECEIVED: %f",  current_iws.revolute[1]);
-    ROS_INFO("Steering: %f",  current_iws.steering[0]);
+
+    //ROS_INFO("RECEIVED: %f",  current_iws.revolute[1]);
+    //ROS_INFO("Steering: %f",  current_iws.steering[0]);
 }
 
 MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
@@ -137,6 +153,11 @@ MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
         motionDelta.deltaX = wheel_base*sin(motionDelta.deltaTheta)/tan(steering_angle);
         motionDelta.deltaY = wheel_base*(1.0-cos(motionDelta.deltaTheta)/tan(steering_angle));
     }
+
+    //ROS_INFO("dx: %f", motionDelta.deltaX);
+    //ROS_INFO("dy: %f", motionDelta.deltaY);
+    //ROS_INFO("dtheta: %f", motionDelta.deltaTheta);
+    //ROS_INFO("dt: %f", deltaTime);
 
     return motionDelta;
 
