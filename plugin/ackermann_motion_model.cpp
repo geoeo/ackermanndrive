@@ -75,6 +75,9 @@ int main(int argc, char** argv){
 
         //since all odometry is 6DOF we'll need a quaternion created from yaw
         geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(robotPose.theta);
+        double w = odom_quat.w;
+        //odom_quat.w = odom_quat.z;
+        //odom_quat.z = w;
 
         //first, we'll publish the transform over tf
         geometry_msgs::TransformStamped odom_trans;
@@ -154,10 +157,23 @@ MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
         motionDelta.deltaTheta = 0.0;
     }
 
+    //else {
+    //    motionDelta.deltaTheta = steering_velocity*sin_steering/wheel_base;
+
+
+    //    motionDelta.deltaX = linear_velocity*wheel_base*sin(motionDelta.deltaTheta)/tan(steering_angle);
+    //    motionDelta.deltaY = linear_velocity*wheel_base*(1.0-cos(motionDelta.deltaTheta))/tan(steering_angle);
+
+
+    //}
+
     else if( fabs(linear_velocity) > 1.0){
-        motionDelta.deltaTheta = linear_velocity*sin_steering/wheel_base;
-        motionDelta.deltaX = wheel_base*sin(motionDelta.deltaTheta)/tan(steering_angle);
-        motionDelta.deltaY = wheel_base*(1.0-cos(motionDelta.deltaTheta))/tan(steering_angle);
+       motionDelta.deltaTheta = steering_velocity*sin_steering/wheel_base;
+
+        motionDelta.deltaX = linear_velocity*wheel_base*sin(motionDelta.deltaTheta)/tan(steering_angle);
+       motionDelta.deltaY = linear_velocity*wheel_base*(1.0-cos(motionDelta.deltaTheta))/tan(steering_angle);
+
+
     }
 
     else {

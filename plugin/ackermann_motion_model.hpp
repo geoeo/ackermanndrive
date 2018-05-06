@@ -25,10 +25,8 @@ struct Pose {
     // Pose Update p. 395
     void ApplyMotion(MotionDelta delta, double dt){
 
-        x = x + (delta.deltaX*cos(theta) - delta.deltaY*sin(theta))*dt;
-        y = y + (delta.deltaX*sin(theta) + delta.deltaY*cos(theta))*dt;
-        //x = x + (delta.deltaX*cos(theta))*dt;
-        //y = y + (delta.deltaY*sin(theta))*dt;
+        x += (delta.deltaX*cos(theta) - delta.deltaY*sin(theta))*dt;
+        y += (delta.deltaX*sin(theta) + delta.deltaY*cos(theta))*dt;
         theta += delta.deltaTheta*dt;
 
     }
@@ -42,11 +40,10 @@ void IWS_Callback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg);
 
 MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs);
 
-Pose ApplyMotionToPose(Pose p, MotionDelta delta);
-
 
 double wheel_base = 0.26; //TODO: Get this from config
 double steering_velocity = 25.0;
+double max_steering_omega = 25.0;
 bool ableToCalculateDeltaTime = false;
 double deltaTime = 0.0;
 double gazebo_update_rate = 33.0;

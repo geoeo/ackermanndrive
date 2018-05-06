@@ -253,13 +253,15 @@ namespace gazebo {
         //cmd_iws_publish_.steering[0] = steering_angle_;
         //cmd_iws_publish_.revolute[1] = wheel_velocity_;
 
+        // TODO: estimate based on turning directions as inner wheel changes
         double steering_inner =  RoundTo(steerings_[LEFT ]->GetAngle(0).Radian(),2);
         double cot_steering_inner = cos(steering_inner)/sin(steering_inner);
         double arc_cot_inner = (steeringwidth / (2.0*wheelbase)) + cot_steering_inner;
         double steering_tricicle = atan(1.0/arc_cot_inner);
 
         //cmd_iws_publish_.steering[0] = RoundTo(steerings_[LEFT ]->GetAngle(0).Radian(),2);
-        cmd_iws_publish_.steering[0] = RoundTo(steering_tricicle,2);
+        cmd_iws_publish_.steering[0] = RoundTo(steering_inner,2);
+        //cmd_iws_publish_.steering[0] = RoundTo(steering_angle_,2);
         cmd_iws_publish_.revolute[1] = RoundTo(wheels_[LEFT ]->GetVelocity(0),1);
 
         //ROS_INFO("Publishing steering: %f", cmd_iws_publish_.steering[0]);
