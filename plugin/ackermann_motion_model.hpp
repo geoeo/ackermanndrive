@@ -47,6 +47,7 @@ double max_steering_omega = 25.0;
 bool ableToCalculateDeltaTime = false;
 double deltaTime = 0.0;
 double gazebo_update_rate = 33.0;
+double gazebo_noise_factor_linear_velocity = 1.0;
 
 
 #endif //PROJECT_ACKERMANN_MOTION_MODEL_HPP

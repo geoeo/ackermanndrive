@@ -175,6 +175,8 @@ namespace gazebo {
 
         steering_omega_ = RoundTo(steering_omega_,1);
 
+        //ROS_INFO("gazbo dw: %f", steering_omega_);
+
         double steering_back_left = steering_velocity*sin(actual_angle_[LEFT ]);
         double steering_back_right = steering_velocity*sin(actual_angle_[RIGHT ]);
 

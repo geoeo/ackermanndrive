@@ -65,6 +65,7 @@ int main(int argc, char** argv){
         MotionDelta motionDelta = CalculateAckermannMotionDelta(current_iws);
 
         //ROS_INFO("dt: %f",deltaTime);
+        //ROS_INFO("dw: %f", motionDelta.deltaTheta);
 
         robotPose.ApplyMotion(motionDelta,deltaTime);
         //robotPose.ApplyMotion(motionDelta,1.0);
@@ -167,12 +168,15 @@ MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
 
     //}
 
-    else if( fabs(linear_velocity) > 1.0){
-       motionDelta.deltaTheta = steering_velocity*sin_steering/wheel_base;
+    else if( fabs(linear_velocity) > gazebo_noise_factor_linear_velocity){
 
-        motionDelta.deltaX = linear_velocity*wheel_base*sin(motionDelta.deltaTheta)/tan(steering_angle);
-       motionDelta.deltaY = linear_velocity*wheel_base*(1.0-cos(motionDelta.deltaTheta))/tan(steering_angle);
+        motionDelta.deltaTheta = steering_velocity*sin_steering/wheel_base;
 
+        if(motionDelta.deltaTheta > max_steering_omega) motionDelta.deltaTheta = max_steering_omega;
+        else if (motionDelta.deltaTheta < -max_steering_omega) motionDelta.deltaTheta = -max_steering_omega;
+
+        motionDelta.deltaX = linear_velocity*wheel_base*cos(motionDelta.deltaTheta)/tan(steering_angle);
+        motionDelta.deltaY = linear_velocity*wheel_base*(sin(motionDelta.deltaTheta))/tan(steering_angle);
 
     }
 
