@@ -30,6 +30,14 @@ struct Pose {
         theta += delta.deltaTheta*dt;
 
     }
+
+    void ApplyMotion_2(MotionDelta delta, double dt){
+
+        x += delta.deltaX*dt;
+        y += delta.deltaY*dt;
+        theta += delta.deltaTheta*dt;
+
+    }
 };
 
 
@@ -39,8 +47,11 @@ struct Pose {
 void IWS_Callback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg);
 
 MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs);
+MotionDelta CalculateAckermannMotionDelta_2(tuw_nav_msgs::JointsIWS actionInputs);
+MotionDelta CalculateAckermannMotionDelta_3(tuw_nav_msgs::JointsIWS actionInputs);
 MotionDelta CalculateHolonomicMotionDelta(tuw_nav_msgs::JointsIWS actionInputs);
 
+Pose robotPose;
 
 double wheel_base = 0.26; //TODO: Get this from config
 double steering_velocity = 25.0;
