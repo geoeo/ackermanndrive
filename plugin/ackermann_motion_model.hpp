@@ -39,6 +39,7 @@ struct Pose {
 void IWS_Callback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg);
 
 MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs);
+MotionDelta CalculateHolonomicMotionDelta(tuw_nav_msgs::JointsIWS actionInputs);
 
 
 double wheel_base = 0.26; //TODO: Get this from config
@@ -46,7 +47,7 @@ double steering_velocity = 25.0;
 double max_steering_omega = 25.0;
 bool ableToCalculateDeltaTime = false;
 double deltaTime = 0.0;
-double gazebo_update_rate = 33.0;
+double gazebo_update_rate = 30.0;
 double gazebo_noise_factor_linear_velocity = 1.0;
 
 

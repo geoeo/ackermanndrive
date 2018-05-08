@@ -39,15 +39,17 @@ int main(int argc, char** argv){
     current_time = ros::Time::now();
     last_time = ros::Time::now();
 
-    ros::Rate r(100.0);
+    ros::Rate r(gazebo_update_rate);
+    deltaTime = 0.0;
 
     // strange startup values
     ros::Duration(2).sleep();
     while(n.ok()){
 
         ros::spinOnce();              // check for incoming messages
-        current_time = ros::Time::now();
-
+        //current_time = ros::Time::now();
+        current_time = current_iws.header.stamp;
+        //deltaTime = (current_time - last_time).toSec();
         if(!ableToCalculateDeltaTime)
             continue;
 
@@ -158,15 +160,56 @@ MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
         motionDelta.deltaTheta = 0.0;
     }
 
-    //else {
-    //    motionDelta.deltaTheta = steering_velocity*sin_steering/wheel_base;
+    else if( fabs(linear_velocity) > gazebo_noise_factor_linear_velocity){
+
+        motionDelta.deltaTheta = steering_velocity*sin_steering/wheel_base;
+
+        //
+        if(motionDelta.deltaTheta > max_steering_omega) motionDelta.deltaTheta = max_steering_omega;
+        else if (motionDelta.deltaTheta < -max_steering_omega) motionDelta.deltaTheta = -max_steering_omega;
+
+        motionDelta.deltaTheta *= 2.1; // increases curve traversal speed
+
+        motionDelta.deltaX = -9.0*linear_velocity*wheel_base*sin(motionDelta.deltaTheta)/tan(steering_angle);
+        motionDelta.deltaY = -9.0*linear_velocity*wheel_base*(1.0-cos(motionDelta.deltaTheta))/tan(steering_angle);
+
+    }
+
+    else {
+        motionDelta.deltaTheta = 0.0;
+        motionDelta.deltaX = 0.0;
+        motionDelta.deltaY = 0.0;
+    }
+
+    //ROS_INFO("dx: %f", motionDelta.deltaX);
+    //ROS_INFO("dy: %f", motionDelta.deltaY);
+    //ROS_INFO("dtheta: %f", motionDelta.deltaTheta);
+    //ROS_INFO("dt: %f", deltaTime);
+
+    return motionDelta;
 
 
-    //    motionDelta.deltaX = linear_velocity*wheel_base*sin(motionDelta.deltaTheta)/tan(steering_angle);
-    //    motionDelta.deltaY = linear_velocity*wheel_base*(1.0-cos(motionDelta.deltaTheta))/tan(steering_angle);
+
+}
+
+MotionDelta CalculateHolonomicMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
+    boost::mutex::scoped_lock scoped_lock ( IWS_message_lock );
 
 
-    //}
+    double linear_velocity = actionInputs.revolute[1];
+    double steering_angle = actionInputs.steering[0];
+
+    MotionDelta motionDelta;
+
+    double sin_steering = RoundTo(sin(steering_angle),1);
+
+    // Intro. SLAM by Juan-Antonio Fernandez p. 164
+    // Should be same error thresh. as in iws plugin
+    if(fabs(steering_angle) < 0.1){
+        motionDelta.deltaX = linear_velocity;
+        motionDelta.deltaY = 0.0;
+        motionDelta.deltaTheta = 0.0;
+    }
 
     else if( fabs(linear_velocity) > gazebo_noise_factor_linear_velocity){
 
@@ -176,7 +219,7 @@ MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
         else if (motionDelta.deltaTheta < -max_steering_omega) motionDelta.deltaTheta = -max_steering_omega;
 
         motionDelta.deltaX = linear_velocity*wheel_base*cos(motionDelta.deltaTheta)/tan(steering_angle);
-        motionDelta.deltaY = linear_velocity*wheel_base*(sin(motionDelta.deltaTheta))/tan(steering_angle);
+        motionDelta.deltaY = linear_velocity*wheel_base*sin(motionDelta.deltaTheta)/tan(steering_angle);
 
     }
 
