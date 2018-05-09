@@ -61,7 +61,7 @@ int main(int argc, char** argv){
         //ROS_INFO("dw: %f", motionDelta.deltaTheta);
 
         //robotPose.ApplyMotion(motionDelta,deltaTime);
-        robotPose_2.ApplyMotion_2(motionDelta2,deltaTime);
+        robotPose_2.ApplyMotion(motionDelta2,deltaTime);
         //robotPose_3.ApplyMotion_2(motionDelta3,deltaTime);
 
         //robotPose.ApplyMotion(motionDelta,1.0);
@@ -70,14 +70,12 @@ int main(int argc, char** argv){
         //ROS_INFO("new y: %f",robotPose.y);
 
 
+        Pose& pose = robotPose_2;
+        MotionDelta& currentMotionDelta = motionDelta2;
+
         //since all odometry is 6DOF we'll need a quaternion created from yaw
-        //geometry_msgs::Quaternion odom_quat_1 = tf::createQuaternionMsgFromYaw(robotPose.theta);
-        geometry_msgs::Quaternion odom_quat_2 = tf::createQuaternionMsgFromYaw(robotPose_2.theta);
-        //geometry_msgs::Quaternion odom_quat_3 = tf::createQuaternionMsgFromYaw(robotPose_3.theta);
+        geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(pose.theta);
         //geometry_msgs::Quaternion odom_quat_empty = tf::createQuaternionMsgFromYaw(0.0);
-        //double w = odom_quat.w;
-        //odom_quat.w = odom_quat.z;
-        //odom_quat.z = w;
 
         //first, we'll publish the transform over tf
         geometry_msgs::TransformStamped odom_trans;
@@ -85,12 +83,10 @@ int main(int argc, char** argv){
         odom_trans.header.frame_id = "map";
         odom_trans.child_frame_id = "base_link";
 
-        odom_trans.transform.translation.x = robotPose_2.x;
-        odom_trans.transform.translation.y = robotPose_2.y;
-        //odom_trans.transform.translation.x = 0.0;
-        //odom_trans.transform.translation.y = 0.0;
+        odom_trans.transform.translation.x = pose.x;
+        odom_trans.transform.translation.y = pose.y;
         odom_trans.transform.translation.z = 0.0;
-        odom_trans.transform.rotation = odom_quat_2;
+        odom_trans.transform.rotation = odom_quat;
 
         //send the transform
 
@@ -102,16 +98,16 @@ int main(int argc, char** argv){
         odom.header.frame_id = "map";
 
         //set the position
-        odom.pose.pose.position.x = robotPose_2.x;
-        odom.pose.pose.position.y = robotPose_2.y;
+        odom.pose.pose.position.x = pose.x;
+        odom.pose.pose.position.y = pose.y;
         odom.pose.pose.position.z = 0.0;
-        odom.pose.pose.orientation = odom_quat_2;
+        odom.pose.pose.orientation = odom_quat;
 
         //set the velocity
         odom.child_frame_id = "base_link";
-        odom.twist.twist.linear.x = motionDelta2.deltaX;
-        odom.twist.twist.linear.y = motionDelta2.deltaY;
-        odom.twist.twist.angular.z = motionDelta2.deltaTheta;
+        odom.twist.twist.linear.x = currentMotionDelta.deltaX;
+        odom.twist.twist.linear.y = currentMotionDelta.deltaY;
+        odom.twist.twist.angular.z = currentMotionDelta.deltaTheta;
 
         //publish the message
         odom_pub.publish(odom);
@@ -187,7 +183,7 @@ MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
 
 }
 
-// https://pdfs.semanticscholar.org/5849/770f946e7880000056b5a378d2b7ac89124d.pdf , use with velocity update #2
+// https://pdfs.semanticscholar.org/5849/770f946e7880000056b5a378d2b7ac89124d.pdf
 MotionDelta CalculateAckermannMotionDelta_2(tuw_nav_msgs::JointsIWS actionInputs, Pose& pose){
     boost::mutex::scoped_lock scoped_lock ( IWS_message_lock );
 
@@ -199,16 +195,14 @@ MotionDelta CalculateAckermannMotionDelta_2(tuw_nav_msgs::JointsIWS actionInputs
 
     if( fabs(linear_velocity) > gazebo_noise_factor_linear_velocity){
 
-        //if(fabs(steering_angle) > 0.1)
-        //    motionDelta.deltaTheta = steering_velocity *tan(steering_angle)/wheel_base;
-        //else
-        //    motionDelta.deltaTheta = linear_velocity *tan(steering_angle)/wheel_base;
-
+        // local transformation
         motionDelta.deltaTheta = steering_velocity *tan(steering_angle)/wheel_base;
+        motionDelta.deltaX = linear_velocity;
+        motionDelta.deltaY = 0.0;
 
 
-        motionDelta.deltaX = linear_velocity*sin(M_PI/2.0 - pose.theta);
-        motionDelta.deltaY = linear_velocity*cos(M_PI/2.0 - pose.theta);
+        //motionDelta.deltaX = linear_velocity*sin(M_PI/2.0 - pose.theta);
+        //motionDelta.deltaY = linear_velocity*cos(M_PI/2.0 - pose.theta);
 
     }
 
