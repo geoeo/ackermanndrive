@@ -81,7 +81,7 @@ int main(int argc, char** argv){
         geometry_msgs::TransformStamped odom_trans;
         odom_trans.header.stamp = current_time;
         odom_trans.header.frame_id = "map";
-        odom_trans.child_frame_id = "base_link";
+        odom_trans.child_frame_id = "ackermann_motion";
 
         odom_trans.transform.translation.x = pose.x;
         odom_trans.transform.translation.y = pose.y;
@@ -104,7 +104,7 @@ int main(int argc, char** argv){
         odom.pose.pose.orientation = odom_quat;
 
         //set the velocity
-        odom.child_frame_id = "base_link";
+        odom.child_frame_id = "ackermann_motion";
         odom.twist.twist.linear.x = currentMotionDelta.deltaX;
         odom.twist.twist.linear.y = currentMotionDelta.deltaY;
         odom.twist.twist.angular.z = currentMotionDelta.deltaTheta;
@@ -197,6 +197,7 @@ MotionDelta CalculateAckermannMotionDelta_2(tuw_nav_msgs::JointsIWS actionInputs
 
         // local transformation
         motionDelta.deltaTheta = steering_velocity *tan(steering_angle)/wheel_base;
+
         motionDelta.deltaX = linear_velocity;
         motionDelta.deltaY = 0.0;
 
