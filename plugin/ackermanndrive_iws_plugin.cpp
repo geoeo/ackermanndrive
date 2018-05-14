@@ -58,7 +58,20 @@ namespace gazebo {
         wheels_[LEFT ] -> SetParam( "fmax", 0, wheeltorque );
         wheels_[RIGHT] -> SetParam( "fmax", 0, wheeltorque );
 
-        // initialize update rate stuff
+        // front wheels
+        front_wheels_.resize ( 2 );
+        front_wheels_[LEFT ] = gazebo_ros_ -> getJoint ( parent, "LeftFrontWheel",  "leftfrontwheel"  );
+        front_wheels_[RIGHT] = gazebo_ros_ -> getJoint ( parent, "RightFrontWheel", "righfrontwheel" );
+        //front_wheels_[LEFT ] -> SetParam( "fmax", 0, wheeltorque );
+        //front_wheels_[RIGHT] -> SetParam( "fmax", 0, wheeltorque );
+
+        front_wheels_previous_rotation_.resize(2);
+        front_wheels_previous_rotation_[LEFT] = RoundTo(front_wheels_[LEFT ]->GetAngle(0).Radian(),2);
+        front_wheels_previous_rotation_[RIGHT] = RoundTo(front_wheels_[RIGHT ]->GetAngle(0).Radian(),2);
+
+        front_wheels_rotation_delta_.resize(2);
+
+      // initialize update rate stuff
         if ( this->update_rate_ > 0.0 ) this->update_period_ = 1.0 / this->update_rate_;
         else this->update_period_ = 0.0;
         last_update_time_ = parent->GetWorld()->GetSimTime();
@@ -82,6 +95,7 @@ namespace gazebo {
         steering_angle_ = 0.0;
         steering_omega_ = 0.0;
         wheel_velocity_ = 0.0;
+        wheel_radius_ = wheel_diameter / 2.0;
 
         cmd_iws_publish_.header.seq = 0;
         cmd_iws_publish_.header.stamp = ros::Time::now();
@@ -133,7 +147,7 @@ namespace gazebo {
     void Ackermannplugin_IWS::UpdateChild() {
         //TODO Investigate Locking due to potential Callback Race condtions
 
-        wheel_velocity_ /= wheel_diameter / 2.0;
+        wheel_velocity_ /= wheel_radius_;
 
         double actual_wheel_velocity = RoundTo(wheels_[LEFT]->GetVelocity(0),2);
         wheel_velocity_ = RoundTo(wheel_velocity_,2);
@@ -164,7 +178,25 @@ namespace gazebo {
         actual_velocity[LEFT ] = RoundTo(actual_velocity[LEFT ],1);
         actual_velocity[RIGHT ] = RoundTo(actual_velocity[RIGHT ],1);
 
-        // limit angle based on config settings
+        // calculate rotation angle of wheel for dead reckoning
+        double current_wheel_angle_left = RoundTo( front_wheels_[LEFT ]->GetAngle(0).Radian(),2);
+        double current_wheel_angle_right = RoundTo( front_wheels_[RIGHT ]->GetAngle(0).Radian(),2);
+
+        front_wheels_rotation_delta_[LEFT] = current_wheel_angle_left - front_wheels_previous_rotation_[LEFT];
+        front_wheels_rotation_delta_[RIGHT] = current_wheel_angle_right - front_wheels_previous_rotation_[RIGHT];
+
+        front_wheels_previous_rotation_[LEFT] = current_wheel_angle_left;
+        front_wheels_previous_rotation_[RIGHT] = current_wheel_angle_right;
+
+        if(gazebo_debug){
+          ROS_INFO("current front left angle: %f",current_wheel_angle_left);
+          ROS_INFO("current front right angle: %f",current_wheel_angle_right);
+          ROS_INFO("current left delta: %f",front_wheels_rotation_delta_[LEFT]);
+          ROS_INFO("current right delta: %f",front_wheels_rotation_delta_[RIGHT] );
+        }
+
+
+      // limit angle based on config settings
         if(steering_angle_ > max_steering_angle) steering_angle_ = max_steering_angle;
         else if(steering_angle_ < -max_steering_angle) steering_angle_ = -max_steering_angle;
 
@@ -261,12 +293,15 @@ namespace gazebo {
         double steering_left =  RoundTo(steerings_[LEFT ]->GetAngle(0).Radian(),2);
         double steering_right = RoundTo(steerings_[RIGHT ]->GetAngle(0).Radian(),2);
         double steering_inner =  steering_left >= 0.0 ? steering_left : steering_right;
+        double delta_rotation_inner =  steering_left >= 0.0 ? front_wheels_rotation_delta_[LEFT] : front_wheels_rotation_delta_[RIGHT];
+        double arc_distance_inner = wheel_radius_ * delta_rotation_inner;
         double cot_steering_inner = cos(steering_inner)/sin(steering_inner);
         double arc_cot_inner = (steeringwidth / (2.0*wheelbase)) + cot_steering_inner;
         double steering_tricicle = atan(1.0/arc_cot_inner);
 
         cmd_iws_publish_.steering[0] = RoundTo(steering_tricicle,2);
         cmd_iws_publish_.revolute[1] = RoundTo(wheels_[LEFT ]->GetVelocity(0),1);
+        //cmd_iws_publish_.revolute[1] = RoundTo(arc_distance_inner,5);
 
         //ROS_INFO("Publishing steering: %f", cmd_iws_publish_.steering[0]);
         //ROS_INFO("Publishing rev: %f", cmd_iws_publish_.revolute[1]);

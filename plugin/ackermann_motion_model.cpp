@@ -53,14 +53,14 @@ int main(int argc, char** argv){
 
         //TODO use time from header
 
-        //MotionDelta motionDelta = CalculateAckermannMotionDelta(current_iws);
+        MotionDelta motionDelta = CalculateAckermannMotionDelta(current_iws);
         MotionDelta motionDelta2 = CalculateAckermannMotionDelta_2(current_iws, robotPose_2);
         //MotionDelta motionDelta3 = CalculateAckermannMotionDelta_3(current_iws, robotPose_3);
 
         //ROS_INFO("dt: %f",deltaTime);
         //ROS_INFO("dw: %f", motionDelta.deltaTheta);
 
-        //robotPose.ApplyMotion(motionDelta,deltaTime);
+        robotPose.ApplyMotion(motionDelta,deltaTime);
         robotPose_2.ApplyMotion(motionDelta2,deltaTime);
         //robotPose_3.ApplyMotion_2(motionDelta3,deltaTime);
 
@@ -69,7 +69,7 @@ int main(int argc, char** argv){
         //ROS_INFO("new x: %f",robotPose.x);
         //ROS_INFO("new y: %f",robotPose.y);
 
-
+        //Pose& pose = robotPose;
         Pose& pose = robotPose_2;
         MotionDelta& currentMotionDelta = motionDelta2;
 
@@ -152,7 +152,7 @@ MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
         motionDelta.deltaTheta = 0.0;
     }
 
-    else if( fabs(linear_velocity) > gazebo_noise_factor_linear_velocity){
+    else {
 
         motionDelta.deltaTheta = steering_velocity *sin(steering_angle)/wheel_base;
 
@@ -166,11 +166,11 @@ MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
 
     }
 
-    else {
-        motionDelta.deltaTheta = 0.0;
-        motionDelta.deltaX = 0.0;
-        motionDelta.deltaY = 0.0;
-    }
+    //else {
+    //    motionDelta.deltaTheta = 0.0;
+    //    motionDelta.deltaX = 0.0;
+    //    motionDelta.deltaY = 0.0;
+    //}
 
     //ROS_INFO("dx: %f", motionDelta.deltaX);
     //ROS_INFO("dy: %f", motionDelta.deltaY);

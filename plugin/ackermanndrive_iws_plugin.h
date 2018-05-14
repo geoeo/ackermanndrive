@@ -64,9 +64,14 @@ namespace gazebo {
         double steering_acceleration;
         double linear_acceleration;
 
+        double wheel_radius_;
+
         //Joints
         std::vector<physics::JointPtr> steerings_;
         std::vector<physics::JointPtr> wheels_;
+        std::vector<physics::JointPtr> front_wheels_;
+        std::vector<double> front_wheels_previous_rotation_;
+        std::vector<double> front_wheels_rotation_delta_;
 
         //Rostopic
         std::string command_topic_;
