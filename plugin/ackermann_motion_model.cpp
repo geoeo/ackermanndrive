@@ -54,7 +54,7 @@ int main(int argc, char** argv){
         //TODO use time from header
 
         MotionDelta motionDelta = CalculateAckermannMotionDelta(current_iws);
-        MotionDelta motionDelta2 = CalculateAckermannMotionDelta_2(current_iws, robotPose_2);
+        MotionDelta motionDelta2 = CalculateAckermannMotionDelta_2(current_iws);
         //MotionDelta motionDelta3 = CalculateAckermannMotionDelta_3(current_iws, robotPose_3);
 
         //ROS_INFO("dt: %f",deltaTime);
@@ -152,9 +152,9 @@ MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
         motionDelta.deltaTheta = 0.0;
     }
 
-    else {
+    else if (fabs(linear_velocity) > gazebo_noise_factor_linear_velocity){
 
-        motionDelta.deltaTheta = steering_velocity *sin(steering_angle)/wheel_base;
+        motionDelta.deltaTheta = linear_velocity *sin(steering_angle)/wheel_base;
 
         //
         //if(motionDelta.deltaTheta > max_steering_omega) motionDelta.deltaTheta = max_steering_omega;
@@ -166,11 +166,11 @@ MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
 
     }
 
-    //else {
-    //    motionDelta.deltaTheta = 0.0;
-    //    motionDelta.deltaX = 0.0;
-    //    motionDelta.deltaY = 0.0;
-    //}
+    else {
+        motionDelta.deltaTheta = 0.0;
+        motionDelta.deltaX = 0.0;
+        motionDelta.deltaY = 0.0;
+    }
 
     //ROS_INFO("dx: %f", motionDelta.deltaX);
     //ROS_INFO("dy: %f", motionDelta.deltaY);
@@ -184,7 +184,7 @@ MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
 }
 
 // https://pdfs.semanticscholar.org/5849/770f946e7880000056b5a378d2b7ac89124d.pdf
-MotionDelta CalculateAckermannMotionDelta_2(tuw_nav_msgs::JointsIWS actionInputs, Pose& pose){
+MotionDelta CalculateAckermannMotionDelta_2(tuw_nav_msgs::JointsIWS actionInputs){
     boost::mutex::scoped_lock scoped_lock ( IWS_message_lock );
 
 

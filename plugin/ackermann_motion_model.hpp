@@ -47,7 +47,7 @@ struct Pose {
 void IWS_Callback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg);
 
 MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs);
-MotionDelta CalculateAckermannMotionDelta_2(tuw_nav_msgs::JointsIWS actionInputs,Pose& pose);
+MotionDelta CalculateAckermannMotionDelta_2(tuw_nav_msgs::JointsIWS actionInputs);
 MotionDelta CalculateAckermannMotionDelta_3(tuw_nav_msgs::JointsIWS actionInputs,Pose& pose);
 
 Pose robotPose;
