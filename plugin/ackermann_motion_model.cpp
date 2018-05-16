@@ -60,7 +60,7 @@ int main(int argc, char** argv){
         //ROS_INFO("dt: %f",deltaTime);
         //ROS_INFO("dw: %f", motionDelta.deltaTheta);
 
-        robotPose.ApplyMotion(motionDelta,deltaTime);
+        robotPose.ApplyMotion(motionDelta,1.0);
         robotPose_2.ApplyMotion(motionDelta2,deltaTime);
         //robotPose_3.ApplyMotion_2(motionDelta3,deltaTime);
 
@@ -120,8 +120,8 @@ int main(int argc, char** argv){
 
 void IWS_Callback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg){
 
-    current_iws.revolute[1] = RoundTo(cmd_msg->revolute[1],1);
-    current_iws.steering[0] = RoundTo(cmd_msg->steering[0],2);
+    current_iws.revolute[1] = cmd_msg->revolute[1];
+    current_iws.steering[0] = cmd_msg->steering[0];
     // skip first message
     if(!current_iws.header.stamp.isZero()){
         deltaTime = (cmd_msg->header.stamp-current_iws.header.stamp).toSec()/gazebo_update_rate;
@@ -138,31 +138,36 @@ void IWS_Callback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg){
 MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
     boost::mutex::scoped_lock scoped_lock ( IWS_message_lock );
 
-
+    //TODO: investigate these rounds
     double linear_velocity = actionInputs.revolute[1];
     double steering_angle = actionInputs.steering[0];
 
     MotionDelta motionDelta;
 
-    // Intro. SLAM by Juan-Antonio Fernandez p. 164
-    // Should be same error thresh. as in iws plugin
-    if(fabs(steering_angle) < 0.1){
-        motionDelta.deltaX = linear_velocity;
-        motionDelta.deltaY = 0.0;
-        motionDelta.deltaTheta = 0.0;
-    }
+    //ROS_INFO("linear vel: %f",linear_velocity);
+    if (fabs(linear_velocity) > 0.00001){
 
-    else if (fabs(linear_velocity) > gazebo_noise_factor_linear_velocity){
+        linear_velocity*=gazebo_update_rate;
 
-        motionDelta.deltaTheta = linear_velocity *sin(steering_angle)/wheel_base;
+        // Intro. SLAM by Juan-Antonio Fernandez p. 164
+        // Should be same error thresh. as in iws plugin
+        if(fabs(steering_angle) < 0.1){
+          motionDelta.deltaX = linear_velocity;
+          motionDelta.deltaY = 0.0;
+          motionDelta.deltaTheta = 0.0;
+        }
 
-        //
-        //if(motionDelta.deltaTheta > max_steering_omega) motionDelta.deltaTheta = max_steering_omega;
-        //else if (motionDelta.deltaTheta < -max_steering_omega) motionDelta.deltaTheta = -max_steering_omega;
+        else {
+          motionDelta.deltaTheta = linear_velocity *sin(steering_angle)/wheel_base;
+
+          //
+          //if(motionDelta.deltaTheta > max_steering_omega) motionDelta.deltaTheta = max_steering_omega;
+          //else if (motionDelta.deltaTheta < -max_steering_omega) motionDelta.deltaTheta = -max_steering_omega;
 
 
-        motionDelta.deltaX = wheel_base*sin(motionDelta.deltaTheta)/tan(steering_angle);
-        motionDelta.deltaY = wheel_base*(1.0-cos(motionDelta.deltaTheta))/tan(steering_angle);
+          motionDelta.deltaX = wheel_base*sin(motionDelta.deltaTheta)/tan(steering_angle);
+          motionDelta.deltaY = wheel_base*(1.0-cos(motionDelta.deltaTheta))/tan(steering_angle);
+        }
 
     }
 
@@ -188,22 +193,26 @@ MotionDelta CalculateAckermannMotionDelta_2(tuw_nav_msgs::JointsIWS actionInputs
     boost::mutex::scoped_lock scoped_lock ( IWS_message_lock );
 
 
-    double linear_velocity = actionInputs.revolute[1];
-    double steering_angle = actionInputs.steering[0];
+    //TODO: investigate these rounds
+    double linear_velocity = RoundTo(actionInputs.revolute[1],1);
+    double steering_angle = RoundTo(actionInputs.steering[0],2);
 
     MotionDelta motionDelta;
 
     if( fabs(linear_velocity) > gazebo_noise_factor_linear_velocity){
 
         // local transformation
-        motionDelta.deltaTheta = steering_velocity *tan(steering_angle)/wheel_base;
+        motionDelta.deltaTheta = steering_velocity *sin(steering_angle)/wheel_base;
+
+        //ROS_INFO("delta: %f",motionDelta.deltaTheta);
+
+        //if(motionDelta.deltaTheta > max_steering_omega) motionDelta.deltaTheta = max_steering_omega;
+        //else if (motionDelta.deltaTheta < -max_steering_omega) motionDelta.deltaTheta = -max_steering_omega;
+
+        //ROS_INFO("AFTER delta: %f",motionDelta.deltaTheta);
 
         motionDelta.deltaX = linear_velocity;
         motionDelta.deltaY = 0.0;
-
-
-        //motionDelta.deltaX = linear_velocity*sin(M_PI/2.0 - pose.theta);
-        //motionDelta.deltaY = linear_velocity*cos(M_PI/2.0 - pose.theta);
 
     }
 

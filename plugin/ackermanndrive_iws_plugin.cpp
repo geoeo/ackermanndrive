@@ -66,10 +66,12 @@ namespace gazebo {
         //front_wheels_[RIGHT] -> SetParam( "fmax", 0, wheeltorque );
 
         front_wheels_previous_rotation_.resize(2);
-        front_wheels_previous_rotation_[LEFT] = RoundTo(std::fmod(front_wheels_[LEFT ]->GetAngle(0).Radian(),(2.0*M_PI)),5);
-        front_wheels_previous_rotation_[RIGHT] = RoundTo(std::fmod(front_wheels_[RIGHT ]->GetAngle(0).Radian(),(2.0*M_PI)),5);
+        front_wheels_previous_rotation_[LEFT] = RoundTo(front_wheels_[LEFT ]->GetAngle(0).Radian(),5);
+        front_wheels_previous_rotation_[RIGHT] = RoundTo(front_wheels_[RIGHT ]->GetAngle(0).Radian(),5);
 
         front_wheels_rotation_delta_.resize(2);
+
+        ROS_INFO("Gazebo Update Period: %f",this->update_rate_);
 
       // initialize update rate stuff
         if ( this->update_rate_ > 0.0 ) this->update_period_ = 1.0 / this->update_rate_;
@@ -179,8 +181,8 @@ namespace gazebo {
         actual_velocity[RIGHT ] = RoundTo(actual_velocity[RIGHT ],1);
 
         // calculate rotation angle of wheel for dead reckoning
-        double current_wheel_angle_left = RoundTo( std::fmod(front_wheels_[LEFT ]->GetAngle(0).Radian(),(2.0*M_PI)),5);
-        double current_wheel_angle_right = RoundTo( std::fmod(front_wheels_[RIGHT ]->GetAngle(0).Radian(),(2.0*M_PI)),5);
+        double current_wheel_angle_left = RoundTo(front_wheels_[LEFT ]->GetAngle(0).Radian(),5);
+        double current_wheel_angle_right = RoundTo(front_wheels_[RIGHT ]->GetAngle(0).Radian(),5);
 
         front_wheels_rotation_delta_[LEFT] = current_wheel_angle_left - front_wheels_previous_rotation_[LEFT];
         front_wheels_rotation_delta_[RIGHT] = current_wheel_angle_right - front_wheels_previous_rotation_[RIGHT];
@@ -298,16 +300,12 @@ namespace gazebo {
         double arc_cot_inner = (steeringwidth / (2.0*wheelbase)) + cot_steering_inner;
         double steering_tricicle = atan(1.0/arc_cot_inner);
 
-        double arc_distance_inner =  RoundTo(wheels_[LEFT ]->GetVelocity(0),1);
-        if(steering_inner >= 0.1){
-          double radius_to_tricicle = (wheelbase/tan(steering_tricicle));
-          double omega = (RoundTo(wheels_[RIGHT ]->GetVelocity(0),1) - RoundTo(wheels_[LEFT ]->GetVelocity(0),1))/wheelbase;
-          arc_distance_inner = radius_to_tricicle*omega;
-        }
+        //double arc_distance_inner =  RoundTo(wheels_[LEFT ]->GetVelocity(0),1);
+        double arc_distance_inner =  delta_rotation_inner*wheel_radius_;
 
 
-        cmd_iws_publish_.steering[0] = RoundTo(steering_tricicle,2);
-        cmd_iws_publish_.revolute[1] = RoundTo(wheels_[LEFT ]->GetVelocity(0),1); // velocity based model
+        cmd_iws_publish_.steering[0] = steering_tricicle;
+        cmd_iws_publish_.revolute[1] = wheels_[LEFT ]->GetVelocity(0); // velocity based model
         //cmd_iws_publish_.revolute[1] = RoundTo(arc_distance_tricicle,5);
         //cmd_iws_publish_.revolute[1] = RoundTo(arc_distance_inner,5);
         //cmd_iws_publish_.revolute[1] = RoundTo(wheels_[LEFT ]->GetVelocity(0),1);
