@@ -32,6 +32,9 @@ int main(int argc, char** argv){
     current_iws.revolute[1] = 0.0;
     current_iws.header.stamp = ros::Time(0);
 
+    // matrix of type double with 1 channel
+    cov_preivous = cv::Mat::eye(3,3,CV_64FC1);
+    M = cv::Mat::eye(2,2,CV_64FC1);
 
     current_time = ros::Time::now();
     last_time = ros::Time::now();
@@ -53,8 +56,8 @@ int main(int argc, char** argv){
             continue;
 
 
-        MotionDelta motionDelta = CalculateAckermannMotionDelta(current_iws);
-        MotionDelta motionDelta2 = CalculateAckermannMotionDelta_2(current_iws);
+        MotionDelta motionDelta = CalculateAckermanOdometryMotionModel(current_iws);
+        MotionDelta motionDelta2 = CalculateAckermanVelocityMotionModel(current_iws);
         //MotionDelta motionDelta3 = CalculateAckermannMotionDelta_3(current_iws, robotPose_3);
 
         //ROS_INFO("dt: %f",deltaTime);
@@ -69,8 +72,11 @@ int main(int argc, char** argv){
         //ROS_INFO("new x: %f",robotPose.x);
         //ROS_INFO("new y: %f",robotPose.y);
 
+        // Dead Reckoning Model
         //Pose& pose = robotPose;
         //MotionDelta& currentMotionDelta = motionDelta;
+
+        // Velocity Model
         Pose& pose = robotPose_2;
         MotionDelta& currentMotionDelta = motionDelta2;
 
@@ -110,6 +116,8 @@ int main(int argc, char** argv){
         odom.twist.twist.linear.y = currentMotionDelta.deltaY;
         odom.twist.twist.angular.z = currentMotionDelta.deltaTheta;
 
+        CalculateCovarianceForVelocityModel(odom.pose.covariance,current_iws.revolute[1],pose.theta,current_iws.steering[0],deltaTime);
+
         //publish the message
         odom_pub.publish(odom);
 
@@ -136,7 +144,7 @@ void IWS_Callback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg){
 }
 
 // Madrigal, USe with velocity update #1
-MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
+MotionDelta CalculateAckermanOdometryMotionModel(tuw_nav_msgs::JointsIWS actionInputs){
     boost::mutex::scoped_lock scoped_lock ( IWS_message_lock ); //TODO: investigate lock
 
     double linear_velocity = actionInputs.revolute[1];
@@ -189,7 +197,7 @@ MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
 }
 
 // https://pdfs.semanticscholar.org/5849/770f946e7880000056b5a378d2b7ac89124d.pdf
-MotionDelta CalculateAckermannMotionDelta_2(tuw_nav_msgs::JointsIWS actionInputs){
+MotionDelta CalculateAckermanVelocityMotionModel(tuw_nav_msgs::JointsIWS actionInputs){
     boost::mutex::scoped_lock scoped_lock ( IWS_message_lock );
 
 
@@ -202,7 +210,7 @@ MotionDelta CalculateAckermannMotionDelta_2(tuw_nav_msgs::JointsIWS actionInputs
     if( fabs(linear_velocity) > gazebo_noise_factor_linear_velocity){
 
         // local transformation
-        motionDelta.deltaTheta = steering_velocity *sin(steering_angle)/wheel_base;
+        motionDelta.deltaTheta = steering_velocity *tan(steering_angle)/wheel_base;
 
         //ROS_INFO("delta: %f",motionDelta.deltaTheta);
 
@@ -269,7 +277,56 @@ MotionDelta CalculateAckermannMotionDelta_3(tuw_nav_msgs::JointsIWS actionInputs
     return motionDelta;
 
 
+}
+// Todo Switch to Eigen
+// Every row of the covariance has 6 entries
+// The order of values is [x,y,z,roll,pitch,yaw]
+// i.e. cov[1] = dx/dy , cov[18+2] = droll/dz
+void CalculateCovarianceForVelocityModel(boost::array<double,36>& cov,
+                                         double linear_vel,
+                                         double theta_prev,
+                                         double steering_angle,
+                                         double dt){
 
+
+
+  cv::Mat G(3,3,CV_64FC1,cv::Scalar(0));
+  cv::Mat V(3,2,CV_64FC1,cv::Scalar(0));
+
+  G.at<double>(0,0) = 1.0;
+  G.at<double>(0,2) = -linear_vel*sin(theta_prev)*dt;
+  G.at<double>(1,1) = 1.0;
+  G.at<double>(1,2) = linear_vel*cos(theta_prev)*dt;
+  G.at<double>(2,2) = 1.0;
+
+  V.at<double>(0,0) = cos(theta_prev)*dt;
+  V.at<double>(1,0) = sin(theta_prev)*dt;
+  V.at<double>(2,0) = (tan(steering_angle)/wheel_base)*dt;
+  V.at<double>(2,1) = (steering_velocity*dt)/(pow(cos(steering_angle),2.0)*wheel_base);
+
+
+  cv::Mat current_cov = G*cov_preivous*G.t() + V*M*V.t();
+
+
+  // clear
+  for(int i = 0; i < 36; i++){
+    cov[i] = 0.0;
+  }
+
+  cov[X_COL_OFF] = current_cov.at<double>(0,0); // dx/dx
+  cov[Y_COL_OFF] = current_cov.at<double>(0,1); // dx/dy
+  cov[YAW_COL_OFF] = current_cov.at<double>(0,2); // dtheta/dy
+
+  cov[COV_ROW_OFFSET+X_COL_OFF] = current_cov.at<double>(1,0); // dy/dx
+  cov[COV_ROW_OFFSET+Y_COL_OFF] = current_cov.at<double>(1,1); // dy/dy
+  cov[COV_ROW_OFFSET+YAW_COL_OFF] = current_cov.at<double>(1,2); // dy/dtheta
+
+  cov[5*COV_ROW_OFFSET+X_COL_OFF] = current_cov.at<double>(2,0); // dtheta/dx
+  cov[5*COV_ROW_OFFSET+Y_COL_OFF] = current_cov.at<double>(2,1); // dtheta/dy
+  cov[5*COV_ROW_OFFSET+YAW_COL_OFF] = current_cov.at<double>(2,2); // dtheta/dtheta
+
+
+  cov_preivous = current_cov;
 }
 
 

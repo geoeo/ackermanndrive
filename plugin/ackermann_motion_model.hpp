@@ -10,6 +10,7 @@
 #include <nav_msgs/Odometry.h>
 #include <tuw_nav_msgs/JointsIWS.h>
 #include <boost/thread.hpp>
+#include <opencv2/opencv.hpp>
 
 struct MotionDelta {
     double deltaX = 0.0;
@@ -46,9 +47,15 @@ struct Pose {
 
 void IWS_Callback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg);
 
-MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs);
-MotionDelta CalculateAckermannMotionDelta_2(tuw_nav_msgs::JointsIWS actionInputs);
+MotionDelta CalculateAckermanOdometryMotionModel(tuw_nav_msgs::JointsIWS actionInputs);
+MotionDelta CalculateAckermanVelocityMotionModel(tuw_nav_msgs::JointsIWS actionInputs);
 MotionDelta CalculateAckermannMotionDelta_3(tuw_nav_msgs::JointsIWS actionInputs,Pose& pose);
+
+void CalculateCovarianceForVelocityModel(boost::array<double,36>& cov,
+                                         double linear_vel,
+                                         double theta_prev,
+                                         double steering_angle,
+                                         double dt);
 
 Pose robotPose;
 Pose robotPose_2;
@@ -64,6 +71,14 @@ bool ableToCalculateDeltaTime = false;
 double deltaTime = 0.0;
 double gazebo_update_rate = 30.0; // this has to by snyced with gazebo frame rate for optimal results
 double gazebo_noise_factor_linear_velocity = 1.0;
+// 6 entries per row in the 6x6 covariance matrix
+int COV_ROW_OFFSET = 6;
+int X_COL_OFF = 0;
+int Y_COL_OFF = 1;
+int YAW_COL_OFF = 5;
+
+cv::Mat cov_preivous;
+cv::Mat M; // noise paramters
 
 
 #endif //PROJECT_ACKERMANN_MOTION_MODEL_HPP
