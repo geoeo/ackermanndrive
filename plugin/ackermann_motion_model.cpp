@@ -33,7 +33,6 @@ int main(int argc, char** argv){
     current_iws.header.stamp = ros::Time(0);
 
 
-    ros::Time current_time, last_time;
     current_time = ros::Time::now();
     last_time = ros::Time::now();
 
@@ -45,13 +44,14 @@ int main(int argc, char** argv){
     while(n.ok()){
 
         ros::spinOnce();              // check for incoming messages
-        //current_time = ros::Time::now();
-        current_time = current_iws.header.stamp;
+        current_time = ros::Time::now();
+        //TODO is it better to use ROs time or iws timestamps
+        //deltaTime = (current_time - last_time).toSec()/gazebo_update_rate;
+        //current_time = current_iws.header.stamp;
         //deltaTime = (current_time - last_time).toSec();
         if(!ableToCalculateDeltaTime)
             continue;
 
-        //TODO use time from header
 
         MotionDelta motionDelta = CalculateAckermannMotionDelta(current_iws);
         MotionDelta motionDelta2 = CalculateAckermannMotionDelta_2(current_iws);
@@ -70,6 +70,7 @@ int main(int argc, char** argv){
         //ROS_INFO("new y: %f",robotPose.y);
 
         //Pose& pose = robotPose;
+        //MotionDelta& currentMotionDelta = motionDelta;
         Pose& pose = robotPose_2;
         MotionDelta& currentMotionDelta = motionDelta2;
 
@@ -136,9 +137,8 @@ void IWS_Callback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg){
 
 // Madrigal, USe with velocity update #1
 MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
-    boost::mutex::scoped_lock scoped_lock ( IWS_message_lock );
+    boost::mutex::scoped_lock scoped_lock ( IWS_message_lock ); //TODO: investigate lock
 
-    //TODO: investigate these rounds
     double linear_velocity = actionInputs.revolute[1];
     double steering_angle = actionInputs.steering[0];
 
@@ -161,8 +161,8 @@ MotionDelta CalculateAckermannMotionDelta(tuw_nav_msgs::JointsIWS actionInputs){
           motionDelta.deltaTheta = linear_velocity *sin(steering_angle)/wheel_base;
 
           //
-          //if(motionDelta.deltaTheta > max_steering_omega) motionDelta.deltaTheta = max_steering_omega;
-          //else if (motionDelta.deltaTheta < -max_steering_omega) motionDelta.deltaTheta = -max_steering_omega;
+          //if(motionDelta.deltaTheta > max_steering_omega) motionDelta.deltaTheta = max_steering_omega*gazebo_update_rate;
+          //else if (motionDelta.deltaTheta < -max_steering_omega) motionDelta.deltaTheta = -max_steering_omega*gazebo_update_rate;
 
 
           motionDelta.deltaX = wheel_base*sin(motionDelta.deltaTheta)/tan(steering_angle);
@@ -193,7 +193,7 @@ MotionDelta CalculateAckermannMotionDelta_2(tuw_nav_msgs::JointsIWS actionInputs
     boost::mutex::scoped_lock scoped_lock ( IWS_message_lock );
 
 
-    //TODO: investigate these rounds
+    // same rounds as in gazebo update i.e. same forces as applied to model
     double linear_velocity = RoundTo(actionInputs.revolute[1],1);
     double steering_angle = RoundTo(actionInputs.steering[0],2);
 

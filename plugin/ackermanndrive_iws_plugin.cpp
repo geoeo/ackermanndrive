@@ -180,23 +180,6 @@ namespace gazebo {
         actual_velocity[LEFT ] = RoundTo(actual_velocity[LEFT ],1);
         actual_velocity[RIGHT ] = RoundTo(actual_velocity[RIGHT ],1);
 
-        // calculate rotation angle of wheel for dead reckoning
-        double current_wheel_angle_left = RoundTo(front_wheels_[LEFT ]->GetAngle(0).Radian(),5);
-        double current_wheel_angle_right = RoundTo(front_wheels_[RIGHT ]->GetAngle(0).Radian(),5);
-
-        front_wheels_rotation_delta_[LEFT] = current_wheel_angle_left - front_wheels_previous_rotation_[LEFT];
-        front_wheels_rotation_delta_[RIGHT] = current_wheel_angle_right - front_wheels_previous_rotation_[RIGHT];
-
-        front_wheels_previous_rotation_[LEFT] = current_wheel_angle_left;
-        front_wheels_previous_rotation_[RIGHT] = current_wheel_angle_right;
-
-        if(gazebo_debug){
-          ROS_INFO("current front left angle: %f",current_wheel_angle_left);
-          ROS_INFO("current front right angle: %f",current_wheel_angle_right);
-          ROS_INFO("current left delta: %f",front_wheels_rotation_delta_[LEFT]);
-          ROS_INFO("current right delta: %f",front_wheels_rotation_delta_[RIGHT] );
-        }
-
 
       // limit angle based on config settings
         if(steering_angle_ > max_steering_angle) steering_angle_ = max_steering_angle;
@@ -241,6 +224,24 @@ namespace gazebo {
 
         steerings_[LEFT ]->SetParam("vel", 0, omega[LEFT ]);
         steerings_[RIGHT]->SetParam("vel", 0, omega[RIGHT]);
+
+
+        // calculate rotation angle of wheel for dead reckoning
+        double current_wheel_angle_left = RoundTo(front_wheels_[LEFT ]->GetAngle(0).Radian(),5);
+        double current_wheel_angle_right = RoundTo(front_wheels_[RIGHT ]->GetAngle(0).Radian(),5);
+
+        front_wheels_rotation_delta_[LEFT] = current_wheel_angle_left - front_wheels_previous_rotation_[LEFT];
+        front_wheels_rotation_delta_[RIGHT] = current_wheel_angle_right - front_wheels_previous_rotation_[RIGHT];
+
+        front_wheels_previous_rotation_[LEFT] = current_wheel_angle_left;
+        front_wheels_previous_rotation_[RIGHT] = current_wheel_angle_right;
+
+        if(gazebo_debug){
+          ROS_INFO("current front left angle: %f",current_wheel_angle_left);
+          ROS_INFO("current front right angle: %f",current_wheel_angle_right);
+          ROS_INFO("current left delta: %f",front_wheels_rotation_delta_[LEFT]);
+          ROS_INFO("current right delta: %f",front_wheels_rotation_delta_[RIGHT] );
+        }
 
         last_update_time_ = last_update_time_ + common::Time ( update_period_ );
 
