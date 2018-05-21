@@ -131,12 +131,15 @@ void IWS_Callback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg){
 
     current_iws.revolute[1] = cmd_msg->revolute[1];
     current_iws.steering[0] = cmd_msg->steering[0];
+    ros::Time current_time = ros::Time::now();
     // skip first message
     if(!current_iws.header.stamp.isZero()){
-        deltaTime = (cmd_msg->header.stamp-current_iws.header.stamp).toSec()/gazebo_update_rate;
+        //ros::Time current_time = cmd_msg.header.stamp;
+
+        deltaTime = (current_time-current_iws.header.stamp).toSec()/gazebo_update_rate;
         ableToCalculateDeltaTime = true;
     }
-    current_iws.header.stamp = cmd_msg->header.stamp;
+    current_iws.header.stamp = current_time;
 
 
     //ROS_INFO("RECEIVED: %f",  current_iws.revolute[1]);
@@ -315,7 +318,7 @@ void CalculateCovarianceForVelocityModel(boost::array<double,36>& cov,
 
   cov[X_COL_OFF] = current_cov.at<double>(0,0); // dx/dx
   cov[Y_COL_OFF] = current_cov.at<double>(0,1); // dx/dy
-  cov[YAW_COL_OFF] = current_cov.at<double>(0,2); // dtheta/dy
+  cov[YAW_COL_OFF] = current_cov.at<double>(0,2); // dx/dtheta
 
   cov[COV_ROW_OFFSET+X_COL_OFF] = current_cov.at<double>(1,0); // dy/dx
   cov[COV_ROW_OFFSET+Y_COL_OFF] = current_cov.at<double>(1,1); // dy/dy

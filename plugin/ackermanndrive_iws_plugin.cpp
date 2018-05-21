@@ -84,6 +84,7 @@ namespace gazebo {
         //command_subscriber_ = gazebo_ros_->node()->subscribe(so_twist);
         command_subscriber_iws_ = gazebo_ros_->node()->subscribe(so_iws);
 
+        transform_broadcaster_ = boost::shared_ptr<tf::TransformBroadcaster>(new tf::TransformBroadcaster());
         // rostopic publisher
         joint_iws_publisher_ = gazebo_ros_->node()->advertise<tuw_nav_msgs::JointsIWS>(joint_iws_topic,1);
 
@@ -148,7 +149,7 @@ namespace gazebo {
 
     void Ackermannplugin_IWS::UpdateChild() {
         //TODO Investigate Locking due to potential Callback Race condtions
-
+        //cmd_iws_publish_.header.stamp = ros::Time::now();
         wheel_velocity_ /= wheel_radius_;
 
         double actual_wheel_velocity = RoundTo(wheels_[LEFT]->GetVelocity(0),2);
@@ -246,6 +247,7 @@ namespace gazebo {
         last_update_time_ = last_update_time_ + common::Time ( update_period_ );
 
         PublishJointIWS();
+        //PublishDeadReckoningMotionModel();
     }
 
     double Ackermannplugin_IWS::OmegaFromTricicleModel(double steering_angle) {
@@ -308,13 +310,78 @@ namespace gazebo {
         cmd_iws_publish_.steering[0] = steering_tricicle;
         cmd_iws_publish_.revolute[1] = wheels_[LEFT ]->GetVelocity(0); // velocity based model
         //cmd_iws_publish_.revolute[1] = RoundTo(arc_distance_tricicle,5);
-        //cmd_iws_publish_.revolute[1] = RoundTo(arc_distance_inner,5);
+        //cmd_iws_publish_.revolute[1] = RoundTo(arc_distance_inner,5); // DeadReckoning
         //cmd_iws_publish_.revolute[1] = RoundTo(wheels_[LEFT ]->GetVelocity(0),1);
 
         //ROS_INFO("Publishing steering: %f", cmd_iws_publish_.steering[0]);
         //ROS_INFO("Publishing rev: %f", cmd_iws_publish_.revolute[1]);
 
         joint_iws_publisher_.publish (cmd_iws_publish_);
+    }
+
+    void Ackermannplugin_IWS::PublishDeadReckoningMotionModel() {
+
+      ros::Time current_time = ros::Time::now();
+      //common::Time current_time = parent->GetWorld()->GetSimTime();
+
+      double steering_left =  RoundTo(steerings_[LEFT ]->GetAngle(0).Radian(),2);
+      double steering_right = RoundTo(steerings_[RIGHT ]->GetAngle(0).Radian(),2);
+      double steering_inner =  steering_left >= 0.0 ? steering_left : steering_right;
+      double delta_rotation_inner =  steering_left >= 0.0 ? front_wheels_rotation_delta_[LEFT] : front_wheels_rotation_delta_[RIGHT];
+      double cot_steering_inner = cos(steering_inner)/sin(steering_inner);
+      double arc_cot_inner = (steeringwidth / (2.0*wheelbase)) + cot_steering_inner;
+
+      double steering_tricicle = atan(1.0/arc_cot_inner);
+      double arc_distance_inner =  delta_rotation_inner*wheel_radius_;
+
+      MotionDelta motionDelta;
+
+      if (fabs(arc_distance_inner) > 0.00001){
+
+        //linear_velocity*=gazebo_update_rate;
+
+        // Intro. SLAM by Juan-Antonio Fernandez p. 164
+        // Should be same error thresh. as in iws plugin
+        if(fabs(steering_tricicle) < 0.1){
+          motionDelta.deltaX = arc_distance_inner;
+          motionDelta.deltaY = 0.0;
+          motionDelta.deltaTheta = 0.0;
+        }
+
+        else {
+          motionDelta.deltaTheta = arc_distance_inner *sin(steering_tricicle)/wheelbase;
+
+          //
+          //if(motionDelta.deltaTheta > max_steering_omega) motionDelta.deltaTheta = max_steering_omega*gazebo_update_rate;
+          //else if (motionDelta.deltaTheta < -max_steering_omega) motionDelta.deltaTheta = -max_steering_omega*gazebo_update_rate;
+
+
+          motionDelta.deltaX = wheelbase*sin(motionDelta.deltaTheta)/tan(steering_tricicle);
+          motionDelta.deltaY = wheelbase*(1.0-cos(motionDelta.deltaTheta))/tan(steering_tricicle);
+        }
+
+      }
+
+      else {
+        motionDelta.deltaTheta = 0.0;
+        motionDelta.deltaX = 0.0;
+        motionDelta.deltaY = 0.0;
+      }
+
+      pose.ApplyMotion(motionDelta,1.0);
+
+      tf::Quaternion qt;
+      tf::Vector3 vt;
+
+      vt = tf::Vector3 ( pose.x, pose.y, 0 );
+
+      qt.setRPY(0,0,pose.theta);
+
+
+      tf::Transform tf ( qt, vt );
+      transform_broadcaster_->sendTransform (	tf::StampedTransform ( tf , ros::Time::now() , "map", "ackermann_motion_gazebo" ) );
+      //transform_broadcaster_->sendTransform (odom_quat);
+
     }
 
 

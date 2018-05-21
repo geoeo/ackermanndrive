@@ -44,6 +44,7 @@ namespace gazebo {
         physics::ModelPtr parent;
         GazeboRosPtr gazebo_ros_;
         event::ConnectionPtr update_connection_;
+        boost::shared_ptr<tf::TransformBroadcaster> transform_broadcaster_;
 
 
         boost::mutex lock;
@@ -95,6 +96,7 @@ namespace gazebo {
         void cmdVelCallback(const geometry_msgs::Twist::ConstPtr& cmd_msg);
         void cmdIWSCallback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg);
         void PublishJointIWS();
+        void PublishDeadReckoningMotionModel();
 
         void UpdateChild();
 
@@ -127,6 +129,40 @@ namespace gazebo {
 
         double actual_angle_[2];
         double actual_velocity[2];
+
+
+        struct MotionDelta {
+          double deltaX = 0.0;
+          double deltaY = 0.0;
+          double deltaTheta = 0.0;
+        };
+
+        struct Pose {
+          double x = 0.0;
+          double y = 0.0;
+          double theta = 0.0;
+
+          // Pose Update p. 395
+          void ApplyMotion(MotionDelta delta, double dt){
+
+            x += (delta.deltaX*cos(theta) - delta.deltaY*sin(theta))*dt;
+            y += (delta.deltaX*sin(theta) + delta.deltaY*cos(theta))*dt;
+            theta += delta.deltaTheta*dt;
+
+          }
+
+          void ApplyMotion_2(MotionDelta delta, double dt){
+
+            x += delta.deltaX*dt;
+            y += delta.deltaY*dt;
+            theta += delta.deltaTheta*dt;
+
+          }
+
+      };
+
+
+      Pose pose;
 
     };
 }
