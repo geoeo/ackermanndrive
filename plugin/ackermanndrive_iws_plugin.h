@@ -97,6 +97,7 @@ namespace gazebo {
         void cmdIWSCallback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg);
         void PublishJointIWS();
         void PublishDeadReckoningMotionModel();
+        void PublishVelocityMotionModel();
 
         void UpdateChild();
 
@@ -119,6 +120,7 @@ namespace gazebo {
         double update_rate_;
         double update_period_;
         common::Time last_update_time_;
+        ros::Time vel_last_update_time_;
 
         double wheel_velocity_;
         double steering_omega_;

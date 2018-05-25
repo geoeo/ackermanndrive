@@ -77,6 +77,7 @@ namespace gazebo {
         if ( this->update_rate_ > 0.0 ) this->update_period_ = 1.0 / this->update_rate_;
         else this->update_period_ = 0.0;
         last_update_time_ = parent->GetWorld()->GetSimTime();
+        vel_last_update_time_ = ros::Time::now();
 
         // rostopic subscriber
         ros::SubscribeOptions so_twist = ros::SubscribeOptions::create<geometry_msgs::Twist>(command_topic_, 1, boost::bind(&Ackermannplugin_IWS::cmdVelCallback, this, _1), ros::VoidPtr(), &queue_);
@@ -247,6 +248,7 @@ namespace gazebo {
         last_update_time_ = last_update_time_ + common::Time ( update_period_ );
 
         PublishJointIWS();
+        PublishVelocityMotionModel();
         //PublishDeadReckoningMotionModel();
     }
 
@@ -317,6 +319,64 @@ namespace gazebo {
         //ROS_INFO("Publishing rev: %f", cmd_iws_publish_.revolute[1]);
 
         joint_iws_publisher_.publish (cmd_iws_publish_);
+    }
+
+
+    void Ackermannplugin_IWS::PublishVelocityMotionModel(){
+      ros::Time current_time = ros::Time::now();
+      double dt = (current_time - vel_last_update_time_).toSec() / 30.0;
+      vel_last_update_time_ = current_time;
+
+      //common::Time current_time = parent->GetWorld()->GetSimTime();
+
+      double steering_left =  RoundTo(steerings_[LEFT ]->GetAngle(0).Radian(),2);
+      double steering_right = RoundTo(steerings_[RIGHT ]->GetAngle(0).Radian(),2);
+      double steering_inner =  steering_left >= 0.0 ? steering_left : steering_right;
+      double cot_steering_inner = cos(steering_inner)/sin(steering_inner);
+      double arc_cot_inner = (steeringwidth / (2.0*wheelbase)) + cot_steering_inner;
+
+      double steering_tricicle = RoundTo(atan(1.0/arc_cot_inner),2);
+      double linear_vel = RoundTo(wheels_[LEFT ]->GetVelocity(0),1);
+
+      MotionDelta motionDelta;
+      //ROS_INFO("dt: %f",dt );
+      if (fabs(linear_vel) > 1.0){
+
+
+
+        motionDelta.deltaTheta = steering_velocity *tan(steering_tricicle)/wheelbase;
+
+        //
+        //if(motionDelta.deltaTheta > max_steering_omega) motionDelta.deltaTheta = max_steering_omega*gazebo_update_rate;
+        //else if (motionDelta.deltaTheta < -max_steering_omega) motionDelta.deltaTheta = -max_steering_omega*gazebo_update_rate;
+
+
+        motionDelta.deltaX = linear_vel;
+        motionDelta.deltaY = 0.0;
+
+
+      }
+
+      else {
+        motionDelta.deltaTheta = 0.0;
+        motionDelta.deltaX = 0.0;
+        motionDelta.deltaY = 0.0;
+      }
+
+      pose.ApplyMotion(motionDelta,dt);
+
+      tf::Quaternion qt;
+      tf::Vector3 vt;
+
+      vt = tf::Vector3 ( pose.x, pose.y, 0 );
+
+      qt.setRPY(0,0,pose.theta);
+
+
+      tf::Transform tf ( qt, vt );
+      transform_broadcaster_->sendTransform (	tf::StampedTransform ( tf , ros::Time::now() , "map", "ackermann_motion_gazebo" ) );
+      //transform_broadcaster_->sendTransform (odom_quat);
+
     }
 
     void Ackermannplugin_IWS::PublishDeadReckoningMotionModel() {

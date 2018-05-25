@@ -297,9 +297,11 @@ void CalculateCovarianceForVelocityModel(boost::array<double,36>& cov,
   cv::Mat V(3,2,CV_64FC1,cv::Scalar(0));
 
   G.at<double>(0,0) = 1.0;
-  G.at<double>(0,2) = -linear_vel*sin(theta_prev)*dt;
+  //G.at<double>(0,2) = -linear_vel*sin(theta_prev)*dt;
+  G.at<double>(0,2) = 0.0;
   G.at<double>(1,1) = 1.0;
   G.at<double>(1,2) = linear_vel*cos(theta_prev)*dt;
+  //G.at<double>(1,2) = 0.0;
   G.at<double>(2,2) = 1.0;
 
   V.at<double>(0,0) = cos(theta_prev)*dt;
