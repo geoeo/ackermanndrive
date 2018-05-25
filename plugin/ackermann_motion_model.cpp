@@ -39,7 +39,7 @@ int main(int argc, char** argv){
     current_time = ros::Time::now();
     last_time = ros::Time::now();
 
-    ros::Rate r(gazebo_update_rate);
+    ros::Rate r(ros_update_rate);
     deltaTime = 0.0;
 
     // strange startup values
@@ -136,7 +136,7 @@ void IWS_Callback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg){
     if(!current_iws.header.stamp.isZero()){
         //ros::Time current_time = cmd_msg.header.stamp;
 
-        deltaTime = (current_time-current_iws.header.stamp).toSec()/gazebo_update_rate;
+        deltaTime = (current_time-current_iws.header.stamp).toSec()/ros_update_rate;
         ableToCalculateDeltaTime = true;
     }
     current_iws.header.stamp = current_time;
@@ -158,7 +158,7 @@ MotionDelta CalculateAckermanOdometryMotionModel(tuw_nav_msgs::JointsIWS actionI
     //ROS_INFO("linear vel: %f",linear_velocity);
     if (fabs(linear_velocity) > 0.00001){
 
-        linear_velocity*=gazebo_update_rate;
+        linear_velocity*=ros_update_rate;
 
         // Intro. SLAM by Juan-Antonio Fernandez p. 164
         // Should be same error thresh. as in iws plugin
