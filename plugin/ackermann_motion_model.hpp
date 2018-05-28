@@ -70,7 +70,8 @@ double max_steering_omega = 25.0;
 bool ableToCalculateDeltaTime = false;
 double deltaTime = 0.0;
 double ros_update_rate = 30.0; // this has to by snyced with gazebo frame rate for optimal results
-double gazebo_noise_factor_linear_velocity = 1.0;
+double noise_factor_linear_velocity = 1.0;
+double noise_factor_steering_angle= 0.02;
 // 6 entries per row in the 6x6 covariance matrix
 int COV_ROW_OFFSET = 6;
 int X_COL_OFF = 0;

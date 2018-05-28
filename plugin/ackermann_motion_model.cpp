@@ -136,7 +136,8 @@ void IWS_Callback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg){
     if(!current_iws.header.stamp.isZero()){
         //ros::Time current_time = cmd_msg.header.stamp;
 
-        deltaTime = (current_time-current_iws.header.stamp).toSec()/ros_update_rate;
+        deltaTime = (current_time-current_iws.header.stamp).toSec()/ros_update_rate; // when going through gazebo
+        //deltaTime = (current_time-current_iws.header.stamp).toSec(); // when taking the value directly form gamepad
         ableToCalculateDeltaTime = true;
     }
     current_iws.header.stamp = current_time;
@@ -146,7 +147,8 @@ void IWS_Callback(const tuw_nav_msgs::JointsIWS::ConstPtr& cmd_msg){
     //ROS_INFO("Steering: %f",  current_iws.steering[0]);
 }
 
-// Madrigal, USe with velocity update #1
+// robot local coordiante system
+// Madrigal, use with velocity update #1
 MotionDelta CalculateAckermanOdometryMotionModel(tuw_nav_msgs::JointsIWS actionInputs){
     boost::mutex::scoped_lock scoped_lock ( IWS_message_lock ); //TODO: investigate lock
 
@@ -199,6 +201,7 @@ MotionDelta CalculateAckermanOdometryMotionModel(tuw_nav_msgs::JointsIWS actionI
 
 }
 
+// robot local coordiante system,  use with velocity update #1
 // https://pdfs.semanticscholar.org/5849/770f946e7880000056b5a378d2b7ac89124d.pdf
 MotionDelta CalculateAckermanVelocityMotionModel(tuw_nav_msgs::JointsIWS actionInputs){
     boost::mutex::scoped_lock scoped_lock ( IWS_message_lock );
@@ -208,12 +211,15 @@ MotionDelta CalculateAckermanVelocityMotionModel(tuw_nav_msgs::JointsIWS actionI
     double linear_velocity = RoundTo(actionInputs.revolute[1],1);
     double steering_angle = RoundTo(actionInputs.steering[0],2);
 
+    double vel = 0.0;
+    double alpha = 0.0;
+
     MotionDelta motionDelta;
 
-    if( fabs(linear_velocity) > gazebo_noise_factor_linear_velocity){
+    if( fabs(linear_velocity) > noise_factor_linear_velocity){
 
         // local transformation
-        motionDelta.deltaTheta = steering_velocity *tan(steering_angle)/wheel_base;
+        //motionDelta.deltaTheta = steering_velocity *tan(steering_angle)/wheel_base;
 
         //ROS_INFO("delta: %f",motionDelta.deltaTheta);
 
@@ -222,16 +228,19 @@ MotionDelta CalculateAckermanVelocityMotionModel(tuw_nav_msgs::JointsIWS actionI
 
         //ROS_INFO("AFTER delta: %f",motionDelta.deltaTheta);
 
-        motionDelta.deltaX = linear_velocity;
-        motionDelta.deltaY = 0.0;
+        //motionDelta.deltaX = linear_velocity;
+        //motionDelta.deltaY = 0.0;
+        vel = linear_velocity;
 
     }
 
-    else {
-        motionDelta.deltaTheta = 0.0;
-        motionDelta.deltaX = 0.0;
-        motionDelta.deltaY = 0.0;
+    if ( fabs(steering_angle) > noise_factor_steering_angle){
+      alpha = steering_angle;
     }
+
+    motionDelta.deltaTheta = steering_velocity *tan(alpha)/wheel_base;
+    motionDelta.deltaX = vel;
+    motionDelta.deltaY = 0.0;
 
     //ROS_INFO("dx: %f", motionDelta.deltaX);
     //ROS_INFO("dy: %f", motionDelta.deltaY);
@@ -254,7 +263,7 @@ MotionDelta CalculateAckermannMotionDelta_3(tuw_nav_msgs::JointsIWS actionInputs
 
     MotionDelta motionDelta;
 
-    if( fabs(linear_velocity) > gazebo_noise_factor_linear_velocity){
+    if( fabs(linear_velocity) > noise_factor_linear_velocity){
 
         if(fabs(steering_angle) > 0.1)
             motionDelta.deltaTheta = steering_velocity *tan(steering_angle)/wheel_base;

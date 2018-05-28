@@ -248,7 +248,7 @@ namespace gazebo {
         last_update_time_ = last_update_time_ + common::Time ( update_period_ );
 
         PublishJointIWS();
-        PublishVelocityMotionModel();
+        //PublishVelocityMotionModel();
         //PublishDeadReckoningMotionModel();
     }
 
@@ -308,15 +308,23 @@ namespace gazebo {
         //double arc_distance_inner =  RoundTo(wheels_[LEFT ]->GetVelocity(0),1);
         double arc_distance_inner =  delta_rotation_inner*wheel_radius_;
 
+        double wheel_velocity_from_vehicle = wheels_[LEFT ]->GetVelocity(0);
+
 
         cmd_iws_publish_.steering[0] = steering_tricicle;
-        cmd_iws_publish_.revolute[1] = wheels_[LEFT ]->GetVelocity(0); // velocity based model
+        cmd_iws_publish_.revolute[1] = wheel_velocity_from_vehicle; // velocity based model
         //cmd_iws_publish_.revolute[1] = RoundTo(arc_distance_tricicle,5);
         //cmd_iws_publish_.revolute[1] = RoundTo(arc_distance_inner,5); // DeadReckoning
         //cmd_iws_publish_.revolute[1] = RoundTo(wheels_[LEFT ]->GetVelocity(0),1);
 
+        //cmd_iws_publish_.steering[0] = steering_angle_;
+        //cmd_iws_publish_.revolute[1] = steering_velocity;
+
         //ROS_INFO("Publishing steering: %f", cmd_iws_publish_.steering[0]);
         //ROS_INFO("Publishing rev: %f", cmd_iws_publish_.revolute[1]);
+
+        //ROS_INFO("steering vel: %f", steering_velocity);
+        //ROS_INFO("velocity from vehicle: %f", wheel_velocity_from_vehicle);
 
         joint_iws_publisher_.publish (cmd_iws_publish_);
     }
